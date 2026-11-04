@@ -6,7 +6,7 @@ melhoria contínua, Power Platform/IA, supply chain automotivo; alvo Brasil + Eu
 Construído **sobre** o career-ops (MIT), vendorizado em `upstream/career-ops/`.
 
 ## Estado atual (atualize ao fim de cada sessão)
-- Fase 0 (auditoria) e Fase 1 (instalação) concluídas em 2026-11-04 — ver `docs/STATUS.md`.
+- Fases 0 e 1 concluídas em 2026-11-04 (test-all: 20.229 ok / 5 falhas de ambiente) — ver `docs/STATUS.md`.
 - Nenhum código próprio do Career OS ainda (`apps/`, `packages/` vazios). Fase 2 é a próxima.
 
 ## Regras invioláveis
