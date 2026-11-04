@@ -1,0 +1,14 @@
+# Repo-wide safety net. Project-specific rules live next to each project
+# (career-os/upstream/career-ops/.gitignore protects career-ops user data).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store
+node_modules/
+.next/
+coverage/
+*.log
+# Career OS private data store (never in git)
+career-os/private/

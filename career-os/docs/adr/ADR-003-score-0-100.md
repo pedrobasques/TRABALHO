@@ -1,0 +1,2 @@
+# ADR-003 — Score 0–100 como camada derivada
+Status: proposto. O career-ops pontua 1–5 via LLM. O Career OS calcula um score 0–100 **determinístico** (pesos em YAML versionado, componentes explícitos, "desconhecido" ≠ "atendido") e, quando existir relatório A–H, incorpora o 1–5 como um componente. Gates duros: autorização de trabalho e idioma obrigatório não atendidos → categoria `blocked`, independente da soma.
