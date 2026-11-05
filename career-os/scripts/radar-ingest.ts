@@ -100,6 +100,22 @@ async function main(): Promise<RunLog> {
         const up = await upsertIngestedJobs(db, CAREER_OS_OWNER_ID, jobs);
         stats.db = { inserted: up.inserted, updated: up.updated, failed: up.failed.length };
         for (const f of up.failed) errors.push(`linha rejeitada pelo banco (${f.jobId}): ${f.error}`);
+        // tracker applications → journal (imported history, actor 'import'); idempotent.
+        // Later tracker changes reach the journal through `npm run sync` (pull).
+        const { PostgresPipelineStore } = await import('@career-os/db');
+        const store = new PostgresPipelineStore(db, CAREER_OS_OWNER_ID);
+        let adopted = 0;
+        for (const app of tracker.applications) {
+          const job = jobs.find((n) => n.job.id === app.jobId)?.job;
+          if (!job) continue;
+          try {
+            const r = await store.add(job, { seedHistory: app.history });
+            if (r.created) adopted++;
+          } catch (e) {
+            errors.push(`candidatura ${app.id} não espelhada: ${(e as Error).message}`);
+          }
+        }
+        stats.applicationsAdopted = adopted;
         // profile snapshot for deployments without career-ops files (Vercel)
         const cv = read('cv.md');
         const yml = read('config/profile.yml');
