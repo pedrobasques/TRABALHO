@@ -1,6 +1,6 @@
 # Arquitetura — Career OS
 
-> Status: **proposta** (Fase 2 a implementar). Só o career-ops vendorizado existe hoje.
+> Status: **parcialmente implementada** (sessão 2): `packages/core` e `apps/dashboard` existem; índice derivado e persistência remota ainda não. Detalhes em `IMPLEMENTATION_STATUS.md` e ADR-006.
 
 ## Princípio
 Career OS = **career-ops intocado** (motor + fonte da verdade em arquivos) **+ camadas próprias** em volta.

@@ -8,4 +8,11 @@
 | Career OS packages | `node --test` com fixtures (formato real dos arquivos do career-ops) | Fase 2+ |
 | Matching 0–100 | testes de propriedade: blocker ⇒ categoria `blocked`; desconhecido ≠ atendido | Fase 2 |
 | Dashboard | typecheck, lint, build, Playwright e2e + screenshots 1440px e 390px, axe a11y | Fase 3 |
-Tudo agregado em `career-os/scripts/verify.sh`.
+Comandos reais (sessão 2):
+
+```bash
+cd career-os && npm run check      # typecheck core+dashboard, 30 testes core, build
+npm start & npm run test:e2e       # 13 e2e (Playwright via node:test)
+```
+
+Tudo agregado em `career-os/scripts/verify.sh` (inclui a suíte do career-ops).

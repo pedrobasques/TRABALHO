@@ -1,0 +1,17 @@
+{
+  "name": "career-os",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Career OS — personal career intelligence platform built on top of career-ops (MIT).",
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": { "node": ">=22.18.0" },
+  "scripts": {
+    "dev": "npm --workspace @career-os/dashboard run dev",
+    "build": "npm --workspace @career-os/dashboard run build",
+    "start": "npm --workspace @career-os/dashboard run start",
+    "typecheck": "npm --workspaces run typecheck",
+    "test": "npm --workspace @career-os/core run test",
+    "test:e2e": "npm --workspace @career-os/dashboard run test:e2e",
+    "check": "npm run typecheck && npm test && npm run build"
+  }
+}

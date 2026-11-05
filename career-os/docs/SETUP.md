@@ -1,6 +1,26 @@
 # Setup
 
-Requisitos: Node ≥ 22.13 (ou ≥ 23.4), npm, git. Go só se quiser a TUI opcional.
+Requisitos: Node ≥ 22.18 (Career OS usa type-stripping nativo; o career-ops aceita ≥ 22.13), npm, git.
+
+## Dashboard Career OS
+
+```bash
+cd career-os
+npm install
+npm run check        # typecheck + 30 testes do core + build
+npm start            # http://127.0.0.1:3100 (apenas loopback)
+npm run test:e2e     # 13 testes Playwright; requer o servidor rodando
+```
+
+Fonte de dados: `CAREER_OS_DATA_SOURCE=auto` (padrão: career-ops se houver `data/applications.md` ou
+`data/scan-history.tsv`, senão DEMO), `demo` ou `career-ops`. `CAREER_OPS_ROOT` aponta para outro checkout
+(padrão `career-os/upstream/career-ops`). Testar o modo real sem dados pessoais:
+
+```bash
+CAREER_OS_DATA_SOURCE=career-ops CAREER_OPS_ROOT=$PWD/upstream/career-ops/test-fixtures/upgrade/state-v1.18 npm start
+```
+
+## career-ops (motor)
 
 ```bash
 career-os/scripts/setup.sh            # core + web + build + doctor
