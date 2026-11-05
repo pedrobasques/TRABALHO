@@ -1,19 +1,18 @@
 # ADR-007 — Persistência (Supabase) e sincronização com o career-ops
-Status: aceito (2026-11-05). Complementa ADR-002.
+Status: aceito (2026-11-05), **parcialmente substituído pelo ADR-008**: a propriedade das movimentações do dashboard e a direção da sincronização valem como descritas no ADR-008 (arquivos do career-ops são a única fonte da verdade; o diário é fila + índice).
 
 ## Quem é dono de quê
 | Dado | Fonte da verdade | Banco (Supabase) | Direção |
 |---|---|---|---|
 | Vagas coletadas (`scan-history.tsv`) | career-ops | `jobs` (espelho, `origin='career-ops'`) | career-ops → banco, via `npm run radar -- --db`, idempotente por `(owner, dedupe_key)` |
 | Tracker (`applications.md`, `status-log.tsv`) | career-ops | `applications` + `application_events` *quando adotado* | career-ops → banco ao mover pela 1ª vez (histórico importado com datas, `actor='import'`) |
-| Movimentações feitas no dashboard | **Career OS** | `applications`, `application_events` (append-only) | dashboard → banco. Volta ao career-ops via `set-status.mjs`: **planejado**, ainda não implementado |
-| Perfil (`cv.md`, `profile.yml`) | career-ops | `professional_profiles/experiences/skills` (tabelas criadas; espelho ainda não escrito) | career-ops → banco (planejado) |
+| Movimentações feitas no dashboard | **career-ops** (ADR-008) | `applications`, `application_events` (diário append-only) + `event_sync` | dashboard → diário → tracker via `set-status.mjs` (write-through ou `npm run sync`) — **implementado na sessão 4** |
+| Perfil (`cv.md`, `profile.yml`) | career-ops | `professional_profiles` (+ `snapshot`), `experiences`, `skills` | career-ops → banco via `npm run radar -- --db` — **implementado na sessão 4** |
 | Extensões (elegibilidade "em processo", prioridades) | `private/profile-extension.yml` | idem | — |
 | Match evaluations | derivado (recalculável) | `match_evaluations` (cache por `config_version`+`profile_hash`) | planejado |
 | Execuções de automação | Career OS | `automation_runs` | escrito pelo ingest |
 
-Não existe edição concorrente do mesmo dado em dois lugares: o dashboard nunca escreve nos arquivos do career-ops,
-e o career-ops nunca escreve no banco.
+O dashboard só altera o tracker através de `set-status.mjs` (escritor canônico, com lock); o career-ops nunca escreve no banco — suas mudanças chegam pelo *pull* de `npm run sync`.
 
 ## Decisões
 - **Supabase** (Postgres + Auth + Storage privado, plano Free): RLS nativa, migrações SQL versionadas, conexão por pooler funciona em serverless. Alternativas (Neon + auth própria, SQLite/Turso) exigiriam reconstruir RLS/Auth.

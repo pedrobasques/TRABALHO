@@ -251,7 +251,7 @@ export function Pipeline() {
               </label>
               <InfoNote tone="info" icon={<Info className="size-3.5" />}>
                 {persisted
-                  ? 'Mudanças de etapa são gravadas no servidor com histórico. O tracker do career-ops (applications.md) não é alterado — sincronização de volta via set-status.mjs é planejada.'
+                  ? 'Mudanças de etapa são gravadas no diário com histórico e aplicadas ao tracker do career-ops (fonte da verdade) via set-status.mjs — na hora, se o tracker estiver neste servidor; senão, no próximo npm run sync. Etapas sem equivalente no career-ops ficam só no diário. Veja o selo de cada evento abaixo.'
                   : 'Sem persistência no servidor: mudanças ficam só neste navegador.'}{' '}
                 Nada é enviado a empresas.
               </InfoNote>

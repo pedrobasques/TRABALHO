@@ -9,7 +9,9 @@ Construído **sobre** o career-ops (MIT), vendorizado em `upstream/career-ops/`.
 - Sessão 1: career-ops v1.38.0 vendorizado. Sessão 2: core + dashboard (9 telas, DEMO). PR #1.
 - Sessão 3 (2026-11-05): auth (fail-closed na Vercel), Supabase schema + RLS, PipelineStore persistente
   (arquivo/Postgres), ingest do radar, adaptadores cv.md/profile.yml. Branch `claude/sprint3-cloud-foundation`.
-- **Fonte da verdade do estado: `docs/IMPLEMENTATION_STATUS.md`.** Deploy: `docs/DEPLOYMENT.md`. Dados: `docs/adr/ADR-007…`, `docs/PERSISTENCE.md`.
+- Sessão 4 (2026-11-05): ADR-008 (fonte da verdade única + write-back), sync push/pull, export, dataset via banco
+  (modo Vercel), piloto de coleta (bloqueado pela rede), verify-deploy. Branch `claude/sprint4-real-data`.
+- **Fonte da verdade do estado: `docs/IMPLEMENTATION_STATUS.md`.** Deploy: `docs/DEPLOYMENT.md`. Dados: `docs/adr/ADR-008…`, `docs/PERSISTENCE.md`.
 - Bloqueios externos: conta Vercel/Supabase do usuário; rede do container bloqueia hosts de ATS (coleta real só fora daqui).
 
 ## Regras invioláveis
@@ -21,8 +23,9 @@ Construído **sobre** o career-ops (MIT), vendorizado em `upstream/career-ops/`.
    Nada de DHL/Stellantis confidencial em documentos externos.
 5. Não contornar CAPTCHA, login, antibot ou termos de uso de portais.
 6. Não editar `upstream/career-ops/` — código novo vai em `apps/`/`packages/`; patches inevitáveis em `upstream/PATCHES.md`.
-7. **Arquivos são a fonte da verdade** (doutrina do career-ops): `data/applications.md`, `reports/`, `data/pipeline.md`.
-   Qualquer banco é índice derivado, reconstruível.
+7. **Arquivos do career-ops são a única fonte da verdade** (`data/applications.md` + `status-log.tsv`, `reports/`, `scan-history.tsv`).
+   O banco/diário do Career OS é fila de comandos + índice derivado: movimentações do dashboard são aplicadas ao tracker
+   **somente via `set-status.mjs`** (write-through ou `npm run sync`). Nunca editar `applications.md` diretamente. Ver ADR-008.
 8. Nada de dado simulado sem rótulo "DEMO". Nenhum botão sem função real (ou marcado indisponível).
 9. Pedir autorização antes de: gastos, exposição pública, integrações com contas pessoais, ações destrutivas.
 
@@ -33,7 +36,11 @@ npm run check                        # typecheck + testes core + build do dashbo
 npm start                            # http://127.0.0.1:3100 (login desligado localmente; obrigatório na Vercel)
 npm run test:e2e                     # requer o servidor acima rodando
 npm run test:pg                      # Postgres real local (docs/PERSISTENCE.md)
-npm run radar -- [--scan] [--db]     # ingest/normalização do radar
+npm run radar -- [--scan] [--db]     # ingest/normalização do radar (+ perfil e candidaturas no banco)
+npm run sync -- [--db] [--career-ops <raiz>] [--dry-run]   # diário ⇄ tracker (set-status.mjs)
+npm run export -- [--db]             # export sem perda (JSONL + TSV)
+npm run pilot                        # coleta piloto em fontes públicas (raiz isolada)
+node scripts/verify-deploy.mjs <url> # verificação read-only do deploy protegido
 node apps/dashboard/scripts/hash-password.mjs   # credenciais do login
 CAREER_OS_DATA_SOURCE=demo|career-ops|auto   # fonte de dados (padrão auto)
 career-os/scripts/setup.sh          # instala core + web, build, doctor
