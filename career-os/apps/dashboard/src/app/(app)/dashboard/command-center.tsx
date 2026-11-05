@@ -62,7 +62,7 @@ export function CommandCenter() {
       c.jobs
         .filter((j) => j.status !== 'closed')
         .map((job) => ({ job, match: matches.get(job.id)! }))
-        .filter((r) => r.match.category !== 'blocked')
+        .filter((r) => r.match.category !== 'blocked' && !r.match.insufficientData)
         // category first (it already accounts for eligibility and data sufficiency), then score
         .sort((a, b) => CAT_RANK[a.match.category] - CAT_RANK[b.match.category] || b.match.overallScore - a.match.overallScore)
         .slice(0, 6),

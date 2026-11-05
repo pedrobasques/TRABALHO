@@ -86,7 +86,7 @@ export function JobRadar() {
       sortValue: (r) => r.match.overallScore,
       cell: (r) => (
         <div className="relative inline-flex">
-          <ScoreIndicator score={r.match.overallScore} size="sm" blocked={r.match.category === 'blocked'} />
+          <ScoreIndicator score={r.match.overallScore} size="sm" blocked={r.match.category === 'blocked'} insufficient={r.match.insufficientData} />
           {r.match.category !== 'blocked' && r.match.eligibilityStatus !== 'eligible' && (
             <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full border-2 border-surface bg-warning" title="Elegibilidade de trabalho pendente — o score não a inclui" aria-label="elegibilidade pendente" />
           )}
@@ -179,7 +179,11 @@ export function JobRadar() {
             <span className="tabular font-semibold text-fg">{fmtInt(filtered.length)}</span> de {fmtInt(rows.length)} vagas
             {filtered.length > 0 && (
               <>
-                {' '}· média de aderência <span className="tabular font-medium text-fg">{Math.round(filtered.reduce((s, r) => s + r.match.overallScore, 0) / filtered.length)}</span> ·{' '}
+                {' '}· {(() => {
+                  const ev = filtered.filter((r) => !r.match.insufficientData);
+                  return ev.length ? <>média de aderência <span className="tabular font-medium text-fg">{Math.round(ev.reduce((s, r) => s + r.match.overallScore, 0) / ev.length)}</span> ({ev.length} avaliáveis)</> : 'nenhuma avaliável';
+                })()}{' '}
+                · {filtered.filter((r) => r.match.insufficientData).length} com dados insuficientes ·{' '}
                 {filtered.filter((r) => r.match.category === 'blocked').length} bloqueadas
               </>
             )}
@@ -241,7 +245,7 @@ export function JobRadar() {
           <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
             {pg.items.map((r) => (
               <Link key={r.job.id} href={`/jobs/${r.job.id}`} className="flex gap-3 rounded-lg border border-border bg-surface-2/40 p-4 transition-colors hover:border-border-strong hover:bg-surface-hover">
-                <ScoreIndicator score={r.match.overallScore} blocked={r.match.category === 'blocked'} />
+                <ScoreIndicator score={r.match.overallScore} blocked={r.match.category === 'blocked'} insufficient={r.match.insufficientData} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-fg">{r.job.title}</div>
                   <div className="truncate text-xs text-muted">{r.job.company}</div>

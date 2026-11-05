@@ -31,7 +31,7 @@ export const STAGE_TONE: Record<PipelineStage, Tone> = {
   discovered: 'neutral', qualified: 'info', preparing: 'info', ready_for_review: 'warning', submitted: 'accent', responded: 'accent', interview: 'success', offer: 'success', closed: 'neutral',
 };
 export const RECO_TONE: Record<Recommendation, Tone> = {
-  prioritize: 'success', apply: 'accent', consider: 'warning', verify_eligibility: 'warning', low_priority: 'neutral', do_not_apply: 'danger', job_closed: 'neutral',
+  prioritize: 'success', apply: 'accent', consider: 'warning', verify_eligibility: 'warning', low_priority: 'neutral', do_not_apply: 'danger', job_closed: 'neutral', insufficient_data: 'neutral',
 };
 export const PROVENANCE_TONE: Record<Provenance, Tone> = { proven: 'success', declared: 'accent', interpretation: 'info', pending_validation: 'warning' };
 
@@ -71,7 +71,7 @@ export function OpportunityCard({ job, match, favorite, compact }: { job: Job; m
       className="group flex items-center gap-3.5 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:border-border hover:bg-surface-hover"
       data-testid="opportunity-card"
     >
-      <ScoreIndicator score={match.overallScore} size="sm" blocked={match.category === 'blocked'} />
+      <ScoreIndicator score={match.overallScore} size="sm" blocked={match.category === 'blocked'} insufficient={match.insufficientData} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className="truncate text-sm font-medium text-fg group-hover:text-accent">{job.title}</span>

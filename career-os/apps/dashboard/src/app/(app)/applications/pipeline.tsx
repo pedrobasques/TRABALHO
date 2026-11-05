@@ -47,7 +47,7 @@ function AppCard({ r, onOpen, origin }: { r: Row; onOpen: () => void; origin: 'p
     >
       <button type="button" onClick={onOpen} className="block w-full text-left" aria-label={`Abrir ${r.job.title} — ${r.job.company}`}>
         <div className="flex items-start gap-2">
-          <ScoreIndicator score={r.match.overallScore} size="sm" blocked={r.match.category === 'blocked'} />
+          <ScoreIndicator score={r.match.overallScore} size="sm" blocked={r.match.category === 'blocked'} insufficient={r.match.insufficientData} />
           <div className="min-w-0 flex-1">
             <div className="line-clamp-2 text-[13px] leading-snug font-medium text-fg">{r.job.title}</div>
             <div className="mt-0.5 truncate text-xs text-muted">{r.job.company}</div>
@@ -230,7 +230,7 @@ export function Pipeline() {
             </div>
             <div className="flex-1 space-y-5 overflow-y-auto p-5">
               <div className="flex items-center gap-3">
-                <ScoreIndicator score={open.match.overallScore} blocked={open.match.category === 'blocked'} />
+                <ScoreIndicator score={open.match.overallScore} blocked={open.match.category === 'blocked'} insufficient={open.match.insufficientData} />
                 <div className="text-sm">
                   <div className="text-fg">Etapa máxima alcançada: {STAGE_LABEL[maxStageReached(open.app)]}</div>
                   <Link href={`/jobs/${open.job.id}`} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">

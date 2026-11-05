@@ -58,7 +58,8 @@ const RECO_RANK: Record<MatchResult['recommendation'], number> = {
   consider: 3,
   low_priority: 4,
   do_not_apply: 5,
-  job_closed: 6,
+  job_closed: 7,
+  insufficient_data: 6,
 };
 
 export function applyJobFilter(rows: JobRow[], f: JobFilter): JobRow[] {

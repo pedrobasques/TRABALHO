@@ -64,6 +64,7 @@ export const RECOMMENDATION_LABEL: Record<Recommendation, string> = {
   low_priority: 'Baixa prioridade',
   do_not_apply: 'Não recomendada',
   job_closed: 'Vaga encerrada',
+  insufficient_data: 'Dados insuficientes para avaliação',
 };
 
 export const ELIGIBILITY_LABEL: Record<EligibilityStatus, string> = {

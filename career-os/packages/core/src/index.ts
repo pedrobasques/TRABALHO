@@ -13,3 +13,5 @@ export * from './data/career-ops/parse.ts';
 export { AUTOMATION_CATALOG } from './automation/catalog.ts';
 export * from './ingest/normalize.ts';
 export * from './persistence/pipeline.ts';
+export * from './ingest/triage.ts';
+export * from './ingest/jd-extract.ts';

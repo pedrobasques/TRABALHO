@@ -12,6 +12,7 @@
  *  - templates/states.yml: canonical statuses + aliases
  */
 import type { Application, Job, PipelineStage, StageEvent } from '../../domain/types.ts';
+import { detectPrimaryCountry } from '../../ingest/normalize.ts';
 
 export interface TrackerRow {
   num: string;
@@ -197,6 +198,13 @@ export function trackerToDomain(rows: TrackerRow[], log: StatusLogRow[] = [], al
   return { jobs, applications, warnings };
 }
 
+/** Stable short id from the posting URL (FNV-1a 64-bit, hex) — pure, no node:crypto so the module stays client-safe. */
+export function urlHash(url: string): string {
+  let h = 0xcbf29ce484222325n;
+  for (const ch of new TextEncoder().encode(url)) h = BigInt.asUintN(64, (h ^ BigInt(ch)) * 0x100000001b3n);
+  return h.toString(16).padStart(16, '0');
+}
+
 export const SCAN_HISTORY_COLUMNS = [
   'url', 'first_seen', 'portal', 'title', 'company', 'status', 'location', 'fingerprint',
   'posted_at', 'trust_score', 'trust_flags', 'normalized_company', 'requisition_id', 'language', 'listing_key',
@@ -213,11 +221,15 @@ export function scanHistoryToJobs(text: string): Job[] {
     const get = (k: (typeof SCAN_HISTORY_COLUMNS)[number]) =>
       legacy ? (k === 'url' ? cells[0]! : k === 'first_seen' ? cells[1]! : k === 'title' ? cells[2]! : '') : (cells[SCAN_HISTORY_COLUMNS.indexOf(k)] ?? '');
     if (get('url') === 'url' || !/^https?:\/\//.test(get('url'))) continue;
+    const scanStatus = get('status');
+    // rows the scanner filtered out (skipped_title / skipped_location / skipped_age / skipped_expired …) are not openings
+    if (/^skipped/.test(scanStatus)) continue;
     const loc = get('location');
-    const country = /\b(Brazil|Brasil)\b/i.test(loc) ? 'BR' : /\bItal/i.test(loc) ? 'IT' : /\b(Germany|Deutschland)\b/i.test(loc) ? 'DE' : /\b(Spain|España)\b/i.test(loc) ? 'ES' : /\bNetherlands\b/i.test(loc) ? 'NL' : /\b(United States|USA)\b/i.test(loc) ? 'US' : /\bAustralia\b/i.test(loc) ? 'AU' : '??';
+    const country = detectPrimaryCountry(loc) ?? '??';;
     const first = get('first_seen').slice(0, 10);
     out.push({
-      id: `scan-${get('listing_key') || get('fingerprint') || slug(get('url'))}`,
+      // identity from the native listing key or the posting URL — never the content fingerprint (shared by cross-listings)
+      id: `scan-${get('listing_key') ? get('listing_key').replace(/^listing_v1_/, '').slice(0, 24) : urlHash(get('url'))}`,
       origin: 'career-ops',
       title: get('title') || '(sem título)',
       normalizedTitle: get('title') || '(sem título)',
@@ -233,9 +245,10 @@ export function scanHistoryToJobs(text: string): Job[] {
       salary: null,
       postedAt: get('posted_at') ? get('posted_at').slice(0, 10) : null,
       discoveredAt: first || '1970-01-01',
-      verifiedAt: null,
-      status: /closed|expired|dead/i.test(get('status')) ? 'closed' : 'unverified',
-      source: { name: get('portal') || 'scan', url: get('url') },
+      // "added" = returned live by the ATS API at collection time → open, verified that day
+      status: /closed|expired|dead/i.test(scanStatus) ? 'closed' : scanStatus === 'added' ? 'open' : 'unverified',
+      verifiedAt: scanStatus === 'added' ? first || null : null,
+      source: { name: get('portal') || 'scan', url: get('url'), externalId: get('requisition_id') || get('listing_key') || null },
       careerOpsScore: null,
       visaSponsorship: 'unknown',
     });
