@@ -48,7 +48,8 @@ export type Recommendation =
   | 'verify_eligibility'
   | 'low_priority'
   | 'do_not_apply'
-  | 'job_closed';
+  | 'job_closed'
+  | 'insufficient_data';
 
 export interface ComponentResult {
   key: ComponentKey;
@@ -79,6 +80,10 @@ export interface MatchResult {
   /** career-ops native 1–5 score, untouched. */
   careerOpsScore: number | null;
   configVersion: string;
+  /** True when the posting lacks the description/requirements needed for a fit judgement. */
+  insufficientData: boolean;
+  /** posting = the job lacks description/requirements; profile = requirements exist but none is verifiable against the profile (e.g. no CV yet). */
+  insufficientReason: 'posting' | 'profile' | null;
 }
 
 const norm = (s: string) => s.trim().toLowerCase();
@@ -130,6 +135,7 @@ export function evaluateRequirement(req: Requirement, job: Job, profile: Candida
   switch (req.category) {
     case 'skill': {
       if (!req.key) return r('unknown', 'Requisito não mapeado para uma competência conhecida.');
+      if (profile.skills.length === 0) return r('unknown', 'Perfil sem competências importadas (CV pendente).');
       const s = findSkill(profile, req.key);
       if (!s) return r('not_met', 'Não consta no perfil.');
       if (s.provenance === 'pending_validation') return r('unknown', `"${s.label}" consta no perfil, mas está pendente de validação.`);
@@ -137,6 +143,7 @@ export function evaluateRequirement(req: Requirement, job: Job, profile: Candida
     }
     case 'certification': {
       if (!req.key) return r('unknown', 'Certificação não mapeada.');
+      if (profile.skills.length === 0 && profile.certifications.length === 0) return r('unknown', 'Certificações não importadas (CV pendente).');
       const c = profile.certifications.find((x) => norm(x.key) === norm(req.key!));
       if (!c) return r('not_met', 'Certificação não consta no perfil.');
       if (c.provenance === 'pending_validation') return r('unknown', `"${c.label}" pendente de validação.`);
@@ -144,6 +151,7 @@ export function evaluateRequirement(req: Requirement, job: Job, profile: Candida
     }
     case 'education': {
       if (!req.key) return r('unknown', 'Requisito de formação não mapeado.');
+      if (profile.education.length === 0) return r('unknown', 'Formação não importada (CV pendente).');
       const e = profile.education.find((x) => norm(x.key) === norm(req.key!));
       if (!e) return r('not_met', 'Formação não consta no perfil.');
       if (e.status !== 'completed' || e.provenance === 'pending_validation') {
@@ -160,6 +168,7 @@ export function evaluateRequirement(req: Requirement, job: Job, profile: Candida
     }
     case 'language': {
       if (!req.language) return r('unknown', 'Idioma não especificado.');
+      if (profile.languages.length === 0) return r('unknown', 'Idiomas não declarados no perfil.');
       const l = profile.languages.find((x) => norm(x.code) === norm(req.language!.code));
       if (!l) return r('not_met', `${req.language.code.toUpperCase()} não consta no perfil.`);
       if (l.level == null) return r('unknown', `${l.label}: nível não documentado.`);
@@ -187,6 +196,7 @@ export function evaluateRequirement(req: Requirement, job: Job, profile: Candida
 
 function weightedFraction(results: RequirementResult[], cfg: MatchingConfig): number | null {
   if (results.length === 0) return null;
+  if (results.every((x) => x.status === 'unknown')) return null; // nothing verifiable → no number
   let got = 0;
   let total = 0;
   for (const x of results) {
@@ -348,9 +358,13 @@ export function matchJob(job: Job, profile: CandidateProfile, config: MatchingCo
   const insufficient = coverage < MIN_COVERAGE || reqResults.length === 0;
   if (insufficient && (category === 'excellent' || category === 'high')) category = 'moderate';
 
+  const postingInsufficient = job.requirements.length === 0 || job.description.trim().length < 300;
+  const profileInsufficient = !postingInsufficient && technical == null;
+  const insufficientData = postingInsufficient || profileInsufficient;
   let recommendation: Recommendation;
   if (job.status === 'closed') recommendation = 'job_closed';
   else if (category === 'blocked') recommendation = 'do_not_apply';
+  else if (postingInsufficient) recommendation = 'insufficient_data';
   else if ((eligibilityStatus !== 'eligible' || eligibilityReqUnknown) && category !== 'low') recommendation = 'verify_eligibility';
   else if (category === 'excellent') recommendation = 'prioritize';
   else if (category === 'high') recommendation = 'apply';
@@ -366,6 +380,8 @@ export function matchJob(job: Job, profile: CandidateProfile, config: MatchingCo
   else explanation.push(`Elegibilidade: ${eligibility.detail}`);
   const skipped = components.filter((c) => c.value == null).map((c) => c.key);
   if (skipped.length) explanation.push(`Não avaliado (dados ausentes): ${skipped.join(', ')}.`);
+  if (postingInsufficient) explanation.push('Dados insuficientes para avaliação: a vaga não traz descrição/requisitos suficientes; o score reflete só área, local e senioridade.');
+  if (profileInsufficient) explanation.push('Dados insuficientes para avaliação: nenhum requisito técnico pôde ser verificado contra o perfil (CV ainda não importado).');
   if (insufficient) explanation.push('Dados insuficientes para recomendação forte — categoria limitada a "moderada".');
   if (dataIssues.length) explanation.push(`Inconsistências: ${dataIssues.join(' ')}`);
   if (job.careerOpsScore != null) explanation.push(`Nota do relatório career-ops: ${job.careerOpsScore}/5 (exibida separadamente, não somada).`);
@@ -393,6 +409,8 @@ export function matchJob(job: Job, profile: CandidateProfile, config: MatchingCo
     explanation,
     careerOpsScore: job.careerOpsScore,
     configVersion: cfg.version,
+    insufficientData,
+    insufficientReason: postingInsufficient ? 'posting' : profileInsufficient ? 'profile' : null,
   };
 }
 

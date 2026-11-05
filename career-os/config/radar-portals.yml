@@ -1,0 +1,154 @@
+# Career OS — profile radar (Sprint 4.5). career-ops portals.yml format; used in an ISOLATED data root.
+# Sources verified on 2026-11-05 against their public APIs (HTTP 200 with postings). No login, no scraping.
+# Title filter = deterministic level-1/2 triage; finer A/B/C ranking happens in Career OS (packages/core/src/ingest/triage.ts).
+
+title_filter:
+  positive:
+    # A — engineering & project management (EN / PT / ES / IT / DE / NL)
+    - "Project Engineer"
+    - "Project Manager"
+    - "Program Manager"
+    - "Programme Manager"
+    - "Project Coordinator"
+    - "PMO"
+    - "Portfolio"
+    - "Industrial Engineer"
+    - "Manufacturing Engineer"
+    - "Engineering Manager"
+    - "Projetos"
+    - "Projeto"
+    - "Engenheiro de Produção"
+    - "Engenharia Industrial"
+    - "Proyecto"
+    - "Progetto"
+    - "Projektleiter"
+    - "Projektmanager"
+    - "Projektingenieur"
+    - "Projectleider"
+    # B — industrial transformation
+    - "Digital Manufacturing"
+    - "Smart Manufacturing"
+    - "Industry 4.0"
+    - "Manufacturing Automation"
+    - "Operational Excellence"
+    - "Transformation"
+    - "Transformação"
+    - "Automation Engineer"
+    # C — related
+    - "Continuous Improvement"
+    - "Melhoria Contínua"
+    - "Lean"
+    - "Process Engineer"
+    - "Engenheiro de Processos"
+    - "Supply Chain Engineer"
+    - "Logistics Engineer"
+    - "Operations Manager"
+    - "Production Engineer"
+    - "Excelência Operacional"
+  negative:
+    - "Intern"
+    - "Internship"
+    - "Estágio"
+    - "Estagiário"
+    - "Trainee"
+    - "Werkstudent"
+    - "Praktikant"
+    - "Software Engineer"
+    - "Software Developer"
+    - "DevOps"
+    - "Site Reliability"
+    - "SRE"
+    - "Backend"
+    - "Frontend"
+    - "Full Stack"
+    - "Cloud Infrastructure"
+    - "Data Scientist"
+    - "Sales"
+    - "Account Executive"
+
+location_filter:
+  always_allow:
+    - "Brazil"
+    - "Brasil"
+    - "Italy"
+    - "Italia"
+    - "Germany"
+    - "Deutschland"
+    - "Spain"
+    - "España"
+    - "Netherlands"
+    - "Belgium"
+    - "United Kingdom"
+    - "United States"
+    - "USA"
+    - "Australia"
+    - "Switzerland"
+    - "Remote"
+  allow:
+    - "Brazil"
+    - "Brasil"
+    - "Italy"
+    - "Italia"
+    - "Germany"
+    - "Deutschland"
+    - "Spain"
+    - "Netherlands"
+    - "Belgium"
+    - "United Kingdom"
+    - "United States"
+    - "USA"
+    - "Australia"
+    - "Switzerland"
+    - "Zurich"
+    - "Munich"
+    - "München"
+    - "Berlin"
+    - "Turin"
+    - "Torino"
+    - "Milan"
+    - "Betim"
+    - "São Paulo"
+    - "Remote"
+
+max_posting_age_days: 60
+
+tracked_companies:
+  - name: Stellantis
+    careers_url: https://stellantis.wd3.myworkdayjobs.com/External_Career_Site_ID01
+    enabled: true
+  - name: Caterpillar
+    careers_url: https://cat.wd5.myworkdayjobs.com/CaterpillarCareers
+    enabled: true
+  - name: Rockwell Automation
+    careers_url: https://rockwellautomation.wd1.myworkdayjobs.com/External_Rockwell_Automation
+    enabled: true
+  - name: BMW Group
+    careers_url: https://jobs.bmwgroup.com
+    provider: successfactors
+    api: https://jobs.bmwgroup.com
+    enabled: true
+  - name: Relativity Space
+    careers_url: https://job-boards.greenhouse.io/relativity
+    api: https://boards-api.greenhouse.io/v1/boards/relativity/jobs
+    enabled: true
+  - name: Redwood Materials
+    careers_url: https://job-boards.greenhouse.io/redwoodmaterials
+    api: https://boards-api.greenhouse.io/v1/boards/redwoodmaterials/jobs
+    enabled: true
+  - name: Divergent
+    careers_url: https://job-boards.greenhouse.io/divergent
+    api: https://boards-api.greenhouse.io/v1/boards/divergent/jobs
+    enabled: true
+  - name: Enpal
+    careers_url: https://jobs.ashbyhq.com/enpal
+    enabled: true
+  - name: ANYbotics
+    careers_url: https://jobs.lever.co/anybotics
+    enabled: true
+  - name: Gupy
+    provider: gupy
+    gupy:
+      keywords: ["Engenheiro de Projetos", "Gerente de Projetos", "Coordenador de Projetos", "PMO", "Engenharia Industrial", "Melhoria Contínua", "Engenheiro de Processos", "Excelência Operacional", "Transformação Digital", "Engenheiro de Produção"]
+      since_days: 30
+    max_pages: 1
+    enabled: true

@@ -67,7 +67,23 @@ const COUNTRY_PATTERNS: [CountryCode, RegExp][] = [
   ['CH', /\b(switzerland|schweiz|suisse|zurich|geneva|geneve|basel)\b/],
   ['IE', /\b(ireland|dublin|cork)\b/],
   ['CA', /\b(canada|toronto|montreal|vancouver|ottawa)\b/],
+  ['PL', /\b(poland|polska|katowice|warsaw|warszawa|krakow|wroclaw|gdansk|poznan)\b/],
+  ['MX', /\b(mexico|monterrey|guadalajara|queretaro|cdmx)\b/],
+  ['CO', /\b(colombia|bogota|medellin)\b/],
+  ['DK', /\b(denmark|danmark|copenhagen|aarhus|bronderslev)\b/],
+  ['SE', /\b(sweden|sverige|stockholm|gothenburg|goteborg)\b/],
+  ['AT', /\b(austria|osterreich|vienna|wien|linz|graz)\b/],
+  ['CZ', /\b(czech|czechia|prague|praha|brno)\b/],
+  ['IN', /\b(india|bangalore|bengaluru|pune|chennai|hyderabad|mumbai)\b/],
+  ['CN', /\b(china|shanghai|beijing|suzhou|shenzhen)\b/],
 ];
+
+/** Country of the posting's PRIMARY location: ATS lists the primary location first (" · " / ";" / " | " separated). */
+export function detectPrimaryCountry(location: string | null | undefined): CountryCode | null {
+  if (!location) return null;
+  const first = location.split(/\s+·\s+|;\s*|\s+\|\s+/)[0] ?? '';
+  return detectCountry(first) ?? detectCountry(location);
+}
 
 export function detectCountry(location: string | null | undefined): CountryCode | null {
   if (!location) return null;
@@ -127,7 +143,7 @@ export function normalizeJob(input: Job): NormalizedJob {
   const locationText = [job.city, job.description.slice(0, 400)].filter(Boolean).join(' ');
 
   if (!/^[A-Z]{2}$/.test(job.country)) {
-    const c = detectCountry(job.city ?? '');
+    const c = detectPrimaryCountry(job.city ?? '');
     if (c) job.country = c;
     else issues.push('País não identificado');
   }
@@ -147,6 +163,8 @@ export function normalizeJob(input: Job): NormalizedJob {
 export interface DedupeResult {
   jobs: NormalizedJob[];
   duplicates: { kept: string; dropped: string; reason: 'url' | 'identity' }[];
+  /** Same company|title|country but different native URLs: kept separate, flagged. */
+  possibleReposts: { a: string; b: string }[];
 }
 
 /**
@@ -158,12 +176,19 @@ export function dedupeJobs(items: NormalizedJob[]): DedupeResult {
   const byUrl = new Map<string, NormalizedJob>();
   const byKey = new Map<string, NormalizedJob>();
   const duplicates: DedupeResult['duplicates'] = [];
+  const possibleReposts: DedupeResult['possibleReposts'] = [];
   const out: NormalizedJob[] = [];
 
   const richness = (n: NormalizedJob) => n.job.requirements.length * 10 + n.job.description.length / 100 + (n.job.careerOpsScore != null ? 5 : 0);
 
-  for (const n of items) {
-    const existing = (n.urlKey && byUrl.get(n.urlKey)) || byKey.get(n.dedupeKey);
+  for (let n of items) {
+    let existing = (n.urlKey && byUrl.get(n.urlKey)) || byKey.get(n.dedupeKey);
+    // Distinct native URLs on both sides = distinct requisitions (or a repost): never merged by identity alone.
+    if (existing && n.urlKey && existing.urlKey && n.urlKey !== existing.urlKey) {
+      possibleReposts.push({ a: existing.job.id, b: n.job.id });
+      existing = undefined;
+      n = { ...n, issues: [...n.issues, 'Possível republicação (mesma empresa, cargo e país; outro link)'] };
+    }
     if (!existing) {
       out.push(n);
       if (n.urlKey) byUrl.set(n.urlKey, n);
@@ -193,5 +218,5 @@ export function dedupeJobs(items: NormalizedJob[]): DedupeResult {
     byKey.set(n.dedupeKey, merged);
     duplicates.push({ kept: merged.job.id, dropped: loser.job.id, reason });
   }
-  return { jobs: out, duplicates };
+  return { jobs: out, duplicates, possibleReposts };
 }

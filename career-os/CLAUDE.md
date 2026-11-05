@@ -11,8 +11,10 @@ Construído **sobre** o career-ops (MIT), vendorizado em `upstream/career-ops/`.
   (arquivo/Postgres), ingest do radar, adaptadores cv.md/profile.yml. Branch `claude/sprint3-cloud-foundation`.
 - Sessão 4 (2026-11-05): ADR-008 (fonte da verdade única + write-back), sync push/pull, export, dataset via banco
   (modo Vercel), piloto de coleta (bloqueado pela rede), verify-deploy. Branch `claude/sprint4-real-data`.
+- Sessão 4.5 (2026-11-05): coleta real (10 fontes), triagem, qualificação de JD, identidade por id nativo,
+  shortlist. Branch `claude/sprint45-radar`. Rede liberada; providers usam o proxy via env (ver IMPLEMENTATION_STATUS).
 - **Fonte da verdade do estado: `docs/IMPLEMENTATION_STATUS.md`.** Deploy: `docs/DEPLOYMENT.md`. Dados: `docs/adr/ADR-008…`, `docs/PERSISTENCE.md`.
-- Bloqueios externos: conta Vercel/Supabase do usuário; rede do container bloqueia hosts de ATS (coleta real só fora daqui).
+- Bloqueios externos: conta Vercel/Supabase do usuário; CV validado.
 
 ## Regras invioláveis
 1. **Não inventar** fatos profissionais (resultados, números, datas, cargos, certificações, vistos, idiomas).
@@ -40,6 +42,9 @@ npm run radar -- [--scan] [--db]     # ingest/normalização do radar (+ perfil 
 npm run sync -- [--db] [--career-ops <raiz>] [--dry-run]   # diário ⇄ tracker (set-status.mjs)
 npm run export -- [--db]             # export sem perda (JSONL + TSV)
 npm run pilot                        # coleta piloto em fontes públicas (raiz isolada)
+npm run radar:collect                # coleta real com config/radar-portals.yml (raiz isolada)
+npm run radar -- --career-ops <raiz> --triage --qualify 20 --db   # triagem + JD + banco
+npm run radar:shortlist              # shortlist a partir do banco
 node scripts/verify-deploy.mjs <url> # verificação read-only do deploy protegido
 node apps/dashboard/scripts/hash-password.mjs   # credenciais do login
 CAREER_OS_DATA_SOURCE=demo|career-ops|auto   # fonte de dados (padrão auto)

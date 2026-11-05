@@ -143,8 +143,22 @@ export function scoreTone(score: number): Tone {
   return score >= 80 ? 'success' : score >= 65 ? 'accent' : score >= 50 ? 'warning' : 'neutral';
 }
 
-export function ScoreIndicator({ score, size = 'md', blocked, label }: { score: number; size?: 'sm' | 'md' | 'lg'; blocked?: boolean; label?: string }) {
+export function ScoreIndicator({ score, size = 'md', blocked, label, insufficient }: { score: number; size?: 'sm' | 'md' | 'lg'; blocked?: boolean; label?: string; insufficient?: boolean }) {
   const dim = size === 'lg' ? 88 : size === 'md' ? 44 : 32;
+  if (insufficient) {
+    return (
+      <div
+        className="inline-grid shrink-0 place-items-center rounded-full border border-dashed border-border-strong text-muted"
+        style={{ width: dim, height: dim }}
+        role="img"
+        aria-label="Dados insuficientes para avaliação"
+        title="Dados insuficientes para avaliação — a vaga não traz descrição/requisitos suficientes"
+        data-testid="score-insufficient"
+      >
+        <span className={size === 'lg' ? 'text-base font-semibold' : 'text-[10px] font-semibold'}>n/d</span>
+      </div>
+    );
+  }
   const stroke = size === 'lg' ? 7 : size === 'md' ? 4 : 3;
   const r = (dim - stroke) / 2;
   const c = 2 * Math.PI * r;

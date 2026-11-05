@@ -239,7 +239,7 @@ export function JobDetail({ id }: { id: string }) {
         <div className="space-y-4">
           <Card className="p-5" data-testid="match-card">
             <div className="flex items-center gap-4">
-              <ScoreIndicator score={m.overallScore} size="lg" blocked={m.category === 'blocked'} />
+              <ScoreIndicator score={m.overallScore} size="lg" blocked={m.category === 'blocked'} insufficient={m.insufficientData} />
               <div className="min-w-0 space-y-1.5">
                 <CategoryBadge c={m.category} />
                 <div>

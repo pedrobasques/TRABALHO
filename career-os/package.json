@@ -22,7 +22,9 @@
     "radar": "node scripts/radar-ingest.ts",
     "sync": "node scripts/pipeline-sync.ts",
     "export": "node scripts/pipeline-export.ts",
-    "pilot": "bash scripts/pilot.sh"
+    "pilot": "bash scripts/pilot.sh",
+    "radar:collect": "CAREER_OS_PORTALS=config/radar-portals.yml bash scripts/pilot.sh",
+    "radar:shortlist": "node scripts/radar-shortlist.ts"
   },
   "type": "module"
 }

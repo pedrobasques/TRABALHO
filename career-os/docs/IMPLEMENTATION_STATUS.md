@@ -2,6 +2,22 @@
 
 _Atualizado: 2026-11-05 (sessão 4 — operação real e consistência). Branch: `claude/sprint4-real-data` (empilhada sobre sprint3 → PR #1). Baseline: `main`._
 
+## Sessão 4.5 — radar com coleta real (2026-11-05)
+| Item | Status | Evidência |
+|---|---|---|
+| Coleta real | ✅ | `npm run radar:collect` (config/radar-portals.yml): 10/10 fontes responderam (Stellantis, Caterpillar, Rockwell [Workday]; BMW [SuccessFactors]; Relativity, Redwood, Divergent [Greenhouse]; Enpal [Ashby]; ANYbotics [Lever]; Gupy BR). 3.151 anúncios → 162 após filtros determinísticos do career-ops |
+| Rede no container | ✅ | providers do career-ops exigem `CAREER_OPS_TRUST_PROXY_EGRESS=1` atrás do proxy; `fetch-jd.mjs` exige `NODE_USE_ENV_PROXY=1` — o pipeline aplica ambos quando há `HTTPS_PROXY` |
+| Triagem A/B/C + exclusões | ✅ | `packages/core/src/ingest/triage.ts` (multilíngue) — 159 mantidas, 3 descartadas |
+| Qualificação (JD) | ✅ | `radar-ingest --qualify 20`: JD via `fetch-jd.mjs` (Workday/Greenhouse/Ashby/Lever) e via provider Gupy; extração determinística (`jd-extract.ts`) → 15/20 com requisitos |
+| Identidade / dedup | ✅ | id = id nativo / URL (nunca o fingerprint de conteúdo); vagas com URLs nativas distintas nunca são fundidas (3 "possíveis republicações" sinalizadas); migration 0400 troca `unique(dedupe_key)` por `unique(external_id)` |
+| País primário | ✅ | primeiro local listado pelo ATS; países fora da lista não viram país prioritário |
+| Matching honesto | ✅ | sem CV, requisitos ficam "desconhecidos" (não "não atendidos"); sem requisito verificável → técnico e score "n/d" (`insufficientReason` posting/profile) |
+| Shortlist | ✅ | `npm run radar:shortlist` (lê do banco, mesmo motor) |
+| Fluxo real no dashboard | ✅ local | banco de teste isolado: radar DE (5), detalhe com link Ashby, pipeline → Qualificada, eventos persistidos, funil 0→1 |
+| Supabase/Vercel reais | ⛔ | dependem da conta do proprietário |
+
+Testes 4.5: core **69/69** (+6 de regressão do radar) · Postgres **21/21** · e2e app **13/13** · typecheck/build OK.
+
 ## Sessão 4 — resumo comprovado
 | Item | Status | Evidência |
 |---|---|---|

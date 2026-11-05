@@ -222,6 +222,9 @@ export interface ProfileExtension {
   eligibility?: { country: string; status: EligibilityState; basis?: string }[];
   preferences?: { countries?: Record<string, number>; areas?: Partial<Record<JobArea, number>>; work_modes?: WorkMode[]; min_annual_salary_eur?: number };
   goals?: string[];
+  /** Skills/education DECLARED by the owner outside the CV (e.g. a briefing). Always provenance 'declared'; never levels. */
+  declared_skills?: string[];
+  declared_education?: { degree: string; institution?: string }[];
 }
 
 export function parseYaml<T>(text: string): T | null {
@@ -283,10 +286,25 @@ export function buildProfileFromCareerOps(cvMd: string | null, profileYml: strin
     yearsExperience: years,
     currentSeniority: ext?.current_seniority ?? 'unknown',
     targetSeniority: ext?.target_seniority ?? [],
-    skills: cv?.skills ?? [],
+    skills: [
+      ...(cv?.skills ?? []),
+      ...(ext?.declared_skills ?? [])
+        .map((label) => ({ key: skillKeyFor(label), label, level: null, provenance: 'declared' as const }))
+        .filter((s, i, all) => !(cv?.skills ?? []).some((c) => c.key === s.key) && all.findIndex((x) => x.key === s.key) === i),
+    ],
     languages: cv?.languages ?? [],
     eligibility,
-    education: cv?.education ?? [],
+    education: [
+      ...(cv?.education ?? []),
+      ...(ext?.declared_education ?? []).map((e, i) => ({
+        id: `ext-edu-${i + 1}`,
+        institution: e.institution ?? '—',
+        degree: e.degree,
+        key: /mba|pos|pós|especializa|master/i.test(e.degree) ? 'mba' : /engenharia|engineering/i.test(e.degree) ? 'engineering_degree' : e.degree.toLowerCase(),
+        status: 'unverified' as const,
+        provenance: 'declared' as const,
+      })),
+    ],
     experience: cv?.experience ?? [],
     achievements: [],
     certifications: cv?.certifications ?? [],

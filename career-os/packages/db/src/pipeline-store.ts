@@ -116,15 +116,23 @@ export class PostgresPipelineStore implements PipelineStore {
     }
   }
 
-  /** Upserts the job snapshot (dedupe by owner + identity key) and returns its id. */
+  /**
+   * Resolves the job row: same native id, or the same identity AND the same (or absent) posting URL.
+   * Two postings with the same identity but different URLs are distinct requisitions → distinct rows.
+   */
   private async upsertJob(tx: Tx, job: Job): Promise<string> {
+    const found = await tx.query<{ id: string }>(
+      `select id from public.jobs where external_id = $1 or (dedupe_key = $2 and url_key is not distinct from $3) order by (external_id = $1) desc limit 1`,
+      [job.id, jobDedupeKey(job), urlKey(job.source.url)],
+    );
+    if (found.rows[0]) return found.rows[0].id;
     const country = /^[A-Z]{2}$/.test(job.country) ? job.country : null;
     const r = await tx.query<{ id: string }>(
       `insert into public.jobs (owner_id, external_id, dedupe_key, url_key, origin, title, normalized_title, company, normalized_company,
                                country, city, work_mode, seniority, area, description, requirements, salary, posted_at,
                                discovered_at, verified_at, status, career_ops_score, raw)
        values (auth.uid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17, $18, $19, $20, $21, $22::jsonb)
-       on conflict (owner_id, dedupe_key) do update
+       on conflict (owner_id, external_id) do update
          set verified_at = greatest(public.jobs.verified_at, excluded.verified_at),
              status = excluded.status
        returning id`,

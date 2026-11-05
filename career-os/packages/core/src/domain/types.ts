@@ -94,6 +94,8 @@ export interface Salary {
 
 export interface JobSource {
   name: string;
+  /** Native identifier in the source ATS (requisition id / listing key), when published. */
+  externalId?: string | null;
   /** Original posting URL. `null` for demo records — never invent real links. */
   url: string | null;
 }

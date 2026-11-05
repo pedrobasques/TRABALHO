@@ -8,9 +8,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PRIV="${CAREER_OS_PRIVATE_DIR:-$ROOT/private}"
 PILOT="$PRIV/pilot-root"
 mkdir -p "$PILOT/data"
-cp "$ROOT/config/pilot-portals.yml" "$PILOT/portals.yml"
+PORTALS="${CAREER_OS_PORTALS:-$ROOT/config/pilot-portals.yml}"
+cp "$PORTALS" "$PILOT/portals.yml"
 echo "== scan (career-ops scan.mjs, public ATS APIs only) — data root: $PILOT"
-( cd "$ROOT/upstream/career-ops" && CAREER_OPS_ROOT="$PILOT" node scan.mjs --json | tail -1 > "$PILOT/last-scan-receipt.json" )
+( cd "$ROOT/upstream/career-ops" && CAREER_OPS_TRUST_PROXY_EGRESS="${CAREER_OPS_TRUST_PROXY_EGRESS:-$([ -n "${HTTPS_PROXY:-}" ] && echo 1)}" CAREER_OPS_ROOT="$PILOT" node scan.mjs --json | tail -1 > "$PILOT/last-scan-receipt.json" )
 cat "$PILOT/last-scan-receipt.json"; echo
 echo "== portal health"; tail -n +2 "$PILOT/data/portal-health.tsv" 2>/dev/null | tail -n 10
 echo "== ingest"

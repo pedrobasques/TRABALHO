@@ -33,18 +33,26 @@ export async function upsertIngestedJobs(db: Db, ownerId: string, items: Normali
                                  country, city, work_mode, seniority, area, description, requirements, salary, posted_at,
                                  discovered_at, verified_at, status, career_ops_score, quality_issues, raw, source_id)
          values (auth.uid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb, $17, $18, $19, $20, $21, $22, $23::jsonb, $24)
-         on conflict (owner_id, dedupe_key) do update set
+         on conflict (owner_id, external_id) do update set
+           dedupe_key = excluded.dedupe_key, url_key = excluded.url_key,
+           -- derived normalization may improve between runs
+           country = excluded.country, city = excluded.city, work_mode = excluded.work_mode, seniority = excluded.seniority, area = excluded.area,
            verified_at = greatest(public.jobs.verified_at, excluded.verified_at),
            status = excluded.status,
            posted_at = coalesce(public.jobs.posted_at, excluded.posted_at),
            career_ops_score = coalesce(excluded.career_ops_score, public.jobs.career_ops_score),
-           quality_issues = excluded.quality_issues
+           quality_issues = excluded.quality_issues,
+           -- qualification enriches a row later: keep the richer description / requirements, never erase them
+           description = case when length(excluded.description) > length(public.jobs.description) then excluded.description else public.jobs.description end,
+           requirements = case when jsonb_array_length(excluded.requirements) > 0 then excluded.requirements else public.jobs.requirements end,
+           salary = coalesce(excluded.salary, public.jobs.salary),
+           raw = public.jobs.raw || excluded.raw
          returning (xmax = 0) as inserted`,
         [
           j.id, n.dedupeKey ?? jobDedupeKey(j), n.urlKey, j.origin, j.title, j.normalizedTitle, j.company, j.company.trim().toLowerCase(),
           /^[A-Z]{2}$/.test(j.country) ? j.country : null, j.city, j.workMode, j.seniority, j.area, j.description,
           JSON.stringify(j.requirements), j.salary ? JSON.stringify(j.salary) : null, j.postedAt, j.discoveredAt, j.verifiedAt,
-          j.status, j.careerOpsScore, n.issues, JSON.stringify({ url: j.source.url, source: j.source.name }), sourceIds.get(srcName),
+          j.status, j.careerOpsScore, n.issues, JSON.stringify({ url: j.source.url, source: j.source.name, externalId: j.source.externalId ?? null, visa: j.visaSponsorship }), sourceIds.get(srcName),
         ],
       );
       await tx.query('release savepoint job_row');

@@ -28,7 +28,7 @@ interface JobRow {
   status: Job['status'];
   career_ops_score: string | null;
   quality_issues: string[];
-  raw: { url?: string | null; source?: string } | null;
+  raw: { url?: string | null; source?: string; externalId?: string | null; visa?: Job['visaSponsorship'] } | null;
   source_name: string | null;
 }
 
@@ -64,9 +64,9 @@ export async function loadJobs(db: Db, ownerId: string, limit = 2000): Promise<J
         discoveredAt: x.discovered_at.toISOString().slice(0, 10),
         verifiedAt: day(x.verified_at),
         status: x.status,
-        source: { name: x.source_name ?? x.raw?.source ?? 'career-ops', url: x.raw?.url ?? null },
+        source: { name: x.source_name ?? x.raw?.source ?? 'career-ops', url: x.raw?.url ?? null, externalId: x.raw?.externalId ?? null },
         careerOpsScore: x.career_ops_score == null ? null : Number(x.career_ops_score),
-        visaSponsorship: 'unknown',
+        visaSponsorship: x.raw?.visa ?? 'unknown',
         qualityIssues: x.quality_issues,
       }),
     );
