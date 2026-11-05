@@ -1,0 +1,5 @@
+# Minimal Supabase CLI project config (used by `supabase db push` / `supabase migration up`).
+project_id = "career-os"
+
+[db]
+major_version = 16

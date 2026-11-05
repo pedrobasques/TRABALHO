@@ -110,7 +110,9 @@ function ReqRow({ r }: { r: RequirementResult }) {
 }
 
 export function JobDetail({ id }: { id: string }) {
-  const { dataset, matches, isFavorite, toggleFavorite, addToPipeline } = useStore();
+  const { dataset, matches, isFavorite, toggleFavorite, addToPipeline, persistence } = useStore();
+  const [adding, setAdding] = useState(false);
+  const persisted = persistence.kind === 'file' || persistence.kind === 'postgres';
   const toast = useToast();
   const [confirm, setConfirm] = useState(false);
   const job = dataset.jobs.find((j) => j.id === id)!;
@@ -168,7 +170,7 @@ export function JobDetail({ id }: { id: string }) {
               <KanbanSquare className="size-4" /> No pipeline: {STAGE_LABEL[app.stage]}
             </Link>
           ) : (
-            <Button variant="primary" icon={<KanbanSquare className="size-4" />} onClick={() => setConfirm(true)} disabled={job.status === 'closed'}>
+            <Button variant="primary" icon={<KanbanSquare className="size-4" />} onClick={() => setConfirm(true)} disabled={job.status === 'closed' || adding || persistence.kind === 'loading'}>
               Enviar ao pipeline
             </Button>
           )}
@@ -353,15 +355,21 @@ export function JobDetail({ id }: { id: string }) {
         title="Enviar ao pipeline?"
         description={
           <>
-            A vaga entra na etapa <strong>Descoberta</strong> do seu pipeline. {dataset.origin === 'demo' ? 'Por ser modo DEMO, ' : ''}o registro fica salvo apenas neste navegador — não é uma candidatura e nada é enviado à empresa.
+            A vaga entra na etapa <strong>Descoberta</strong> do seu pipeline.{' '}
+            {persisted ? `O registro é salvo no servidor (${persistence.kind === 'postgres' ? 'Supabase' : 'arquivo local'}) com histórico.` : 'Sem persistência no servidor: o registro fica somente neste navegador.'}{' '}
+            Não é uma candidatura e nada é enviado à empresa.
           </>
         }
         confirmLabel="Adicionar"
         onCancel={() => setConfirm(false)}
-        onConfirm={() => {
+        onConfirm={async () => {
           setConfirm(false);
-          const created = addToPipeline(id);
-          toast(created ? 'Adicionada ao pipeline (local)' : 'Esta vaga já está no pipeline', created ? 'success' : 'info');
+          setAdding(true);
+          const r = await addToPipeline(id);
+          setAdding(false);
+          if (!r.ok) toast(`Não foi possível adicionar: ${r.error}`, 'error');
+          else if (r.created === false) toast('Esta vaga já está no pipeline', 'info');
+          else toast(persisted ? 'Adicionada ao pipeline (salvo no servidor)' : 'Adicionada ao pipeline (somente neste navegador)');
         }}
       />
     </div>

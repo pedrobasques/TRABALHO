@@ -1,7 +1,10 @@
 import type { NextConfig } from 'next';
 
 const config: NextConfig = {
-  transpilePackages: ['@career-os/core'],
+  transpilePackages: ['@career-os/core', '@career-os/db'],
+  serverExternalPackages: ['pg'],
+  // never bundle the vendored career-ops tree or private data into serverless functions
+  outputFileTracingExcludes: { '*': ['../../upstream/**', '../../private/**', '../../supabase/**'] },
   poweredByHeader: false,
   reactStrictMode: true,
   async redirects() {

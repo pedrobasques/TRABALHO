@@ -1,13 +1,18 @@
 'use client';
 
 /**
- * Client data store. Holds the dataset delivered by the server plus a LOCAL
- * overlay (favorites, demo pipeline moves, jobs sent to the pipeline) kept in
- * this browser's localStorage only. Overlay changes are never written to
- * career-ops files or any server, and the UI labels them as local.
+ * Client data store.
+ *
+ * - The dataset (jobs, base applications, profile) comes from the server.
+ * - Pipeline changes go to the server-side PipelineStore (/api/pipeline) when the
+ *   deployment has one (file locally, Supabase in the cloud). Persisted applications
+ *   override the dataset's application for the same job.
+ * - When the server reports no persistence (e.g. Vercel without DATABASE_URL), changes
+ *   fall back to this browser's localStorage and the UI says so explicitly.
+ * - Favorites are always browser-local.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { matchAll, type Application, type Dataset, type MatchResult, type PipelineStage, type StageEvent } from '@career-os/core';
+import { matchAll, toApplication, type Application, type Dataset, type MatchResult, type PipelineStage, type StageEvent, type StoredApplication } from '@career-os/core';
 
 const KEY = 'career-os:local-overlay:v1';
 
@@ -18,31 +23,47 @@ interface Overlay {
 }
 const EMPTY: Overlay = { favorites: [], added: [], moves: {} };
 
+export interface PersistenceStatus {
+  kind: 'file' | 'postgres' | 'none' | 'loading' | 'error';
+  persistent: boolean;
+  detail: string;
+}
+
+export type ActionResult = { ok: true; created?: boolean } | { ok: false; error: string };
+
 interface Store {
   base: Dataset;
   dataset: Dataset;
   matches: Map<string, MatchResult>;
   overlay: Overlay;
   hydrated: boolean;
+  persistence: PersistenceStatus;
+  /** Browser-only changes (favorites + fallback pipeline edits). */
   localChanges: number;
   isFavorite: (jobId: string) => boolean;
   toggleFavorite: (jobId: string) => void;
-  addToPipeline: (jobId: string) => Application | null;
-  moveApplication: (appId: string, stage: PipelineStage) => void;
+  addToPipeline: (jobId: string) => Promise<ActionResult>;
+  moveApplication: (appId: string, stage: PipelineStage) => Promise<ActionResult>;
   resetLocal: () => void;
-  isLocal: (appId: string) => boolean;
+  /** 'persisted' = stored server-side; 'local' = browser-only; null = untouched source record. */
+  changeOrigin: (appId: string) => 'persisted' | 'local' | null;
+  refreshPipeline: () => Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);
 
-function today(asOf: string): string {
-  // Demo data lives on a fixed reference date; real data uses the actual day.
-  return asOf;
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } });
+  const body = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+  return body;
 }
 
 export function DataProvider({ dataset: base, children }: { dataset: Dataset; children: React.ReactNode }) {
   const [overlay, setOverlay] = useState<Overlay>(EMPTY);
   const [hydrated, setHydrated] = useState(false);
+  const [stored, setStored] = useState<StoredApplication[]>([]);
+  const [persistence, setPersistence] = useState<PersistenceStatus>({ kind: 'loading', persistent: false, detail: 'Verificando persistência…' });
 
   useEffect(() => {
     try {
@@ -53,6 +74,20 @@ export function DataProvider({ dataset: base, children }: { dataset: Dataset; ch
     }
     setHydrated(true);
   }, [base.origin]);
+
+  const refreshPipeline = useCallback(async () => {
+    try {
+      const r = await api<{ status: PersistenceStatus; applications: StoredApplication[] }>('/api/pipeline');
+      setPersistence(r.status);
+      setStored(r.applications);
+    } catch (e) {
+      setPersistence({ kind: 'error', persistent: false, detail: `Falha ao ler o pipeline persistido: ${(e as Error).message}` });
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshPipeline();
+  }, [refreshPipeline]);
 
   const persist = useCallback(
     (next: Overlay) => {
@@ -66,17 +101,29 @@ export function DataProvider({ dataset: base, children }: { dataset: Dataset; ch
     [base.origin],
   );
 
+  const serverMode = persistence.kind === 'file' || persistence.kind === 'postgres';
+
   const dataset = useMemo<Dataset>(() => {
-    const apps = [...base.applications, ...overlay.added].map((a) => {
-      const extra = overlay.moves[a.id];
-      if (!extra?.length) return a;
-      const history = [...a.history, ...extra];
-      return { ...a, history, stage: history[history.length - 1]!.stage };
-    });
+    const byJob = new Map(stored.map((s) => [s.job.jobId, toApplication(s)]));
+    let apps = base.applications.map((a) => byJob.get(a.jobId) ?? a);
+    const known = new Set(apps.map((a) => a.jobId));
+    apps = [...apps, ...[...byJob.values()].filter((a) => !known.has(a.jobId))];
+    if (!serverMode) {
+      // browser-only fallback
+      apps = [...apps, ...overlay.added.filter((a) => !known.has(a.jobId))].map((a) => {
+        const extra = overlay.moves[a.id];
+        if (!extra?.length) return a;
+        const history = [...a.history, ...extra];
+        return { ...a, history, stage: history[history.length - 1]!.stage };
+      });
+    }
     return { ...base, applications: apps };
-  }, [base, overlay]);
+  }, [base, stored, overlay, serverMode]);
 
   const matches = useMemo(() => matchAll(base.jobs, base.profile), [base]);
+  const persistedIds = useMemo(() => new Set(stored.map((s) => s.id)), [stored]);
+
+  const upsertStored = (app: StoredApplication) => setStored((xs) => [...xs.filter((x) => x.id !== app.id && x.job.jobId !== app.job.jobId), app]);
 
   const value: Store = {
     base,
@@ -84,33 +131,57 @@ export function DataProvider({ dataset: base, children }: { dataset: Dataset; ch
     matches,
     overlay,
     hydrated,
-    localChanges: overlay.favorites.length + overlay.added.length + Object.keys(overlay.moves).length,
+    persistence,
+    localChanges: overlay.favorites.length + (serverMode ? 0 : overlay.added.length + Object.keys(overlay.moves).length),
     isFavorite: (id) => overlay.favorites.includes(id),
     toggleFavorite: (id) =>
       persist({ ...overlay, favorites: overlay.favorites.includes(id) ? overlay.favorites.filter((x) => x !== id) : [...overlay.favorites, id] }),
-    addToPipeline: (jobId) => {
-      if (dataset.applications.some((a) => a.jobId === jobId)) return null;
+    addToPipeline: async (jobId) => {
+      if (serverMode) {
+        try {
+          const r = await api<{ application: StoredApplication; created: boolean }>('/api/pipeline', { method: 'POST', body: JSON.stringify({ jobId }) });
+          upsertStored(r.application);
+          return { ok: true, created: r.created };
+        } catch (e) {
+          return { ok: false, error: (e as Error).message };
+        }
+      }
+      if (persistence.kind === 'loading') return { ok: false, error: 'Persistência ainda carregando; tente novamente.' };
+      if (dataset.applications.some((a) => a.jobId === jobId)) return { ok: true, created: false };
       const app: Application = {
         id: `local-${jobId}`,
         origin: base.origin,
         jobId,
         stage: 'discovered',
-        history: [{ stage: 'discovered', at: today(base.asOf), note: 'Adicionada localmente' }],
+        history: [{ stage: 'discovered', at: base.asOf, note: 'Adicionada neste navegador' }],
         nextAction: 'Triagem',
         nextActionDue: null,
-        notes: 'Registro local (este navegador) — não persistido.',
+        notes: 'Registro somente neste navegador — não persistido no servidor.',
       };
       persist({ ...overlay, added: [...overlay.added, app] });
-      return app;
+      return { ok: true, created: true };
     },
-    moveApplication: (appId, stage) => {
+    moveApplication: async (appId, stage) => {
       const cur = dataset.applications.find((a) => a.id === appId);
-      if (!cur || cur.stage === stage) return;
-      const ev: StageEvent = { stage, at: today(base.asOf), note: 'Movida localmente' };
+      if (!cur) return { ok: false, error: 'Candidatura não encontrada.' };
+      if (cur.stage === stage) return { ok: true };
+      if (serverMode) {
+        try {
+          const r = await api<{ application: StoredApplication }>(`/api/pipeline/${encodeURIComponent(cur.jobId)}`, { method: 'PATCH', body: JSON.stringify({ stage }) });
+          upsertStored(r.application);
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: (e as Error).message };
+        }
+      }
+      if (persistence.kind === 'loading') return { ok: false, error: 'Persistência ainda carregando; tente novamente.' };
+      const ev: StageEvent = { stage, at: base.asOf, note: 'Movida neste navegador' };
       persist({ ...overlay, moves: { ...overlay.moves, [appId]: [...(overlay.moves[appId] ?? []), ev] } });
+      return { ok: true };
     },
     resetLocal: () => persist(EMPTY),
-    isLocal: (appId) => appId.startsWith('local-') || appId in overlay.moves,
+    changeOrigin: (appId) => (persistedIds.has(appId) ? 'persisted' : appId.startsWith('local-') || appId in overlay.moves ? 'local' : null),
+    refreshPipeline,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

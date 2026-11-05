@@ -23,3 +23,4 @@ export function buildDemoDataset(asOf = DEMO_AS_OF): Dataset {
   };
 }
 export { DEMO_PROFILE } from './profile.ts';
+export { buildDemoJobs } from './jobs.ts';

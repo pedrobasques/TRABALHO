@@ -12,6 +12,7 @@ import {
   FileText,
   KanbanSquare,
   LayoutDashboard,
+  LogOut,
   Menu,
   Moon,
   Radar,
@@ -143,7 +144,21 @@ function QuickSearch() {
   );
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+function PersistenceBadge() {
+  const { persistence } = useStore();
+  if (persistence.kind === 'loading') return null;
+  const label = persistence.kind === 'postgres' ? 'Supabase' : persistence.kind === 'file' ? 'Arquivo local' : persistence.kind === 'error' ? 'Erro de persistência' : 'Só navegador';
+  const tone = persistence.kind === 'postgres' || persistence.kind === 'file' ? 'success' : persistence.kind === 'error' ? 'danger' : 'warning';
+  return (
+    <Link href="/settings#persistence" className="hidden sm:inline-flex" data-testid="persistence-badge">
+      <StatusBadge tone={tone} dot title={persistence.detail}>
+        {label}
+      </StatusBadge>
+    </Link>
+  );
+}
+
+export function AppShell({ children, authEnabled = false }: { children: ReactNode; authEnabled?: boolean }) {
   const { dataset, localChanges } = useStore();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -231,7 +246,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </StatusBadge>
               </Link>
             )}
+            <PersistenceBadge />
             <ThemeToggle />
+            {authEnabled && (
+              <form method="post" action="/api/auth/logout">
+                <button type="submit" className="grid size-9 place-items-center rounded-lg text-muted hover:bg-surface-hover hover:text-fg" aria-label="Sair" title="Sair">
+                  <LogOut className="size-4" />
+                </button>
+              </form>
+            )}
           </div>
         </header>
         <main id="main" className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">

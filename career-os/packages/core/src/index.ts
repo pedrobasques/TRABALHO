@@ -11,3 +11,5 @@ export * from './data/demo/index.ts';
 export * from './data/repository.ts';
 export * from './data/career-ops/parse.ts';
 export { AUTOMATION_CATALOG } from './automation/catalog.ts';
+export * from './ingest/normalize.ts';
+export * from './persistence/pipeline.ts';

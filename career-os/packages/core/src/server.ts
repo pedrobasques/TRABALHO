@@ -82,3 +82,5 @@ export function resolveSource(setting = (process.env.CAREER_OS_DATA_SOURCE ?? 'a
 export function loadDataset(): Dataset {
   return resolveSource() === 'career-ops' ? loadCareerOpsDataset() : buildDemoDataset();
 }
+
+export { FilePipelineStore } from './persistence/file-store.ts';
