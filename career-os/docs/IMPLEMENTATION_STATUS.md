@@ -1,6 +1,25 @@
 # Career OS — Implementation Status
 
-_Atualizado: 2026-11-05 (sessão 3 — Cloud Foundation & Real Data). Branch: `claude/sprint3-cloud-foundation` (PR empilhado sobre o PR #1). Baseline: `main`._
+_Atualizado: 2026-11-05 (sessão 4 — operação real e consistência). Branch: `claude/sprint4-real-data` (empilhada sobre sprint3 → PR #1). Baseline: `main`._
+
+## Sessão 4 — resumo comprovado
+| Item | Status | Evidência |
+|---|---|---|
+| Fonte da verdade única (ADR-008) | ✅ | CLAUDE.md regra 7, ADR-007 e ADR-008 dizem o mesmo: arquivos do career-ops canônicos; diário = fila + índice |
+| Write-back dashboard → tracker | ✅ | `set-status.mjs` real: teste core (cópia da fixture), e2e no navegador (linha do tracker + status-log `web`), `npm run sync` no fluxo em modo banco |
+| Pull tracker → diário | ✅ | teste core + fluxo: `set-status.mjs --row 2 Offer` → `npm run sync` → evento `actor=career-ops`, `external` |
+| Export sem perda | ✅ | `npm run export -- --db`: 6 candidaturas, 14 eventos, JSONL + TSV |
+| Dataset via banco (modo Vercel) | ✅ local | dashboard com `CAREER_OS_DATA_SOURCE=database`, sem arquivos: radar, detalhe, pipeline, KPIs e analytics vindos do Postgres |
+| Ingest: falha parcial | ✅ | savepoint por linha; teste: 1 linha inválida reportada, 3 gravadas |
+| Banco indisponível | ✅ | erro tipado `unavailable` (teste pg) e e2e: API 503, UI recusa, sem selo "salvo", etapa inalterada |
+| Isolamento entre usuários | ✅ | testes pg: leitura, escrita, histórico, `event_sync` de outro dono |
+| **Coleta piloto real** | ⛔ **pendente** | `npm run pilot` executado: 2 boards públicos Greenhouse, 0 vagas, 2 falhas `network`. Causa: política de rede do ambiente recusa `boards-api.greenhouse.io` (proxy `connect_rejected`; WebFetch `ENOTFOUND`) |
+| **Fluxo com vaga real** | ⛔ **pendente** | Todas as etapas validadas com a fixture **sintética** do career-ops (`state-v1.18`), não com vagas reais. Não validado: formato real das respostas dos ATS passando por scan.mjs → ingest → banco |
+| Verificação de deploy | 🟡 preparada | `scripts/verify-deploy.mjs` testado contra servidores locais (protegido: PASS; sem auth: 4 FAIL) — nada publicado |
+| Supabase real / Vercel | ⛔ | requer sua conta (passos em DEPLOYMENT.md) |
+
+Testes (sessão 4): core **63/63** · dashboard **4/4** · Postgres real **21/21** (`npm run test:pg`; dentro de `npm run check` a suíte do banco aparece *skipped* por não ter URL — não é aprovação) · e2e **17/17, 0 ignorados** (app 13, auth 2, banco indisponível 1, write-through 1) · build OK.
+
 
 Legenda: ✅ implementado e testado · 🟢 implementado (verificação manual/visual) · 🟡 parcial · 🧪 simulado (DEMO) · ⬜ planejado · ⛔ bloqueado (depende do usuário/infra)
 

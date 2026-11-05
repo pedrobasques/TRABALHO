@@ -199,7 +199,7 @@ export function AppShell({ children, authEnabled = false }: { children: ReactNod
         <div className="border-t border-border p-3">
           {!collapsed && (
             <div className="mb-2 rounded-lg bg-surface-2 px-2.5 py-2 text-[11px] text-muted">
-              Fonte: <span className="font-medium text-fg">{dataset.origin === 'demo' ? 'demonstração' : 'career-ops'}</span>
+              Fonte: <span className="font-medium text-fg">{dataset.origin === 'demo' ? 'demonstração' : dataset.sourceNotes.some((n) => n.startsWith('Fonte: banco')) ? 'banco (espelho do career-ops)' : 'arquivos do career-ops'}</span>
               <br />
               Referência: <span className="tabular">{dataset.asOf}</span>
             </div>

@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { runPipelineContract } from '@career-os/core/tests/pipeline-contract';
 import { buildDemoJobs, dedupeJobs, normalizeJob } from '@career-os/core';
-import { PostgresPipelineStore, createDb, recordAutomationRun, runMigrations, upsertIngestedJobs, withUser, type Db } from '../src/index.ts';
+import { PostgresPipelineStore, createDb, loadJobs, loadProfileSnapshot, recordAutomationRun, runMigrations, upsertIngestedJobs, upsertProfileSnapshot, withUser, type Db } from '../src/index.ts';
+import { DEMO_PROFILE, PipelineError } from '@career-os/core';
 
 const ADMIN_URL = process.env.TEST_DATABASE_URL;
 const here = dirname(fileURLToPath(import.meta.url));
@@ -122,6 +123,26 @@ if (!ADMIN_URL) {
       await assert.rejects(() => withUser(db, b, (tx) => tx.query(`insert into public.applications (owner_id, job_id, origin, stage) values (auth.uid(), $1, 'manual', 'discovered')`, [jobOfA])), /does not belong|row-level security/);
     });
 
+    test('another owner cannot mark my events as synced', async () => {
+      const [a, b] = [await newOwner(), await newOwner()];
+      const job = buildDemoJobs()[7]!;
+      const s = new PostgresPipelineStore(db, a);
+      await s.add(job);
+      await s.move(job.id, 'submitted');
+      const ev = (await s.pendingSync()).at(-1)!.event;
+      await assert.rejects(() => new PostgresPipelineStore(db, b).markSync(ev.id, 'applied', 'hijack'), (e: unknown) => e instanceof PipelineError);
+      assert.equal((await s.pendingSync()).length, 2, 'still pending for the owner');
+    });
+
+    test('database unavailable → typed "unavailable" error, never a silent success', async () => {
+      const dead = createDb({ connectionString: 'postgres://postgres@127.0.0.1:1/none' });
+      extraPools.push(dead);
+      const s = new PostgresPipelineStore(dead, await newOwner());
+      await assert.rejects(() => s.list(), (e: unknown) => e instanceof PipelineError && e.code === 'unavailable');
+      await assert.rejects(() => s.add(buildDemoJobs()[0]!), (e: unknown) => e instanceof PipelineError && e.code === 'unavailable');
+      await assert.rejects(() => s.move('d01', 'qualified'), (e: unknown) => e instanceof PipelineError && e.code === 'unavailable');
+    });
+
     test('every stage change is captured in history with dates and audit log', async () => {
       const a = await newOwner();
       const s = new PostgresPipelineStore(db, a);
@@ -142,11 +163,38 @@ if (!ADMIN_URL) {
       const a = await newOwner();
       const jobs = buildDemoJobs().slice(0, 5).map((j) => normalizeJob({ ...j, origin: 'career-ops' }));
       const first = await upsertIngestedJobs(db, a, jobs);
-      assert.deepEqual(first, { inserted: 5, updated: 0 });
+      assert.deepEqual(first, { inserted: 5, updated: 0, failed: [] });
       const again = await upsertIngestedJobs(db, a, dedupeJobs([...jobs, ...jobs]).jobs);
-      assert.deepEqual(again, { inserted: 0, updated: 5 });
+      assert.deepEqual(again, { inserted: 0, updated: 5, failed: [] });
       const n = await admin.query(`select count(*)::int as n from public.jobs where owner_id = $1`, [a]);
       assert.equal(n.rows[0].n, 5);
+    });
+
+    test('partial failure: an invalid row is reported and the rest of the batch commits', async () => {
+      const a = await newOwner();
+      const jobs = buildDemoJobs().slice(10, 14).map((j) => normalizeJob({ ...j, origin: 'career-ops' }));
+      const bad = { ...jobs[1]!, job: { ...jobs[1]!.job, workMode: 'teleport' as never } };
+      const r = await upsertIngestedJobs(db, a, [jobs[0]!, bad, jobs[2]!, jobs[3]!]);
+      assert.equal(r.inserted, 3);
+      assert.equal(r.failed.length, 1);
+      assert.equal(r.failed[0]!.jobId, bad.job.id);
+      assert.match(r.failed[0]!.error, /check constraint/);
+      const loaded = await loadJobs(db, a);
+      assert.equal(loaded.length, 3);
+      assert.ok(loaded.every((j) => j.source.name), 'source recorded');
+    });
+
+    test('profile snapshot round-trips and is owner-scoped; normalized rows written', async () => {
+      const [a, b] = [await newOwner(), await newOwner()];
+      const profile = { ...DEMO_PROFILE, origin: 'career-ops' as const, importReport: { unknowns: ['x'], notes: [], sources: ['cv.md'] } };
+      const { hash } = await upsertProfileSnapshot(db, a, profile);
+      await upsertProfileSnapshot(db, a, profile); // idempotent replace
+      assert.deepEqual(await loadProfileSnapshot(db, a), profile);
+      assert.equal(await loadProfileSnapshot(db, b), null);
+      const n = await admin.query(`select (select count(*) from public.skills where owner_id=$1)::int s, (select count(*) from public.experiences where owner_id=$1)::int e`, [a]);
+      assert.equal(n.rows[0].s, profile.skills.length);
+      assert.equal(n.rows[0].e, profile.experience.length);
+      assert.equal(hash.length, 16);
     });
 
     test('automation runs are recorded and constraint-checked', async () => {

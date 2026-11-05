@@ -114,11 +114,18 @@ export function Pipeline() {
     const r = rows.find((x) => x.app.id === appId);
     if (!r || r.app.stage === stage) return;
     void moveApplication(appId, stage).then((res) => {
-      if (!res.ok) toast(`Não foi possível mover "${r.job.title}": ${res.error}`, 'error');
-      else toast(`"${r.job.title}" → ${STAGE_LABEL[stage]} ${persisted ? '(salvo com histórico)' : '(somente neste navegador)'}. Nada é enviado a empresas.`);
+      if (!res.ok) return toast(`NÃO salvo — "${r.job.title}": ${res.error}`, 'error');
+      const wb = res.writeBack;
+      if (wb?.failed) return toast(`"${r.job.title}" → ${STAGE_LABEL[stage]}: salvo no diário, mas ${wb.detail}. Será tentado de novo em npm run sync.`, 'error');
+      toast(`"${r.job.title}" → ${STAGE_LABEL[stage]} ${persisted ? '(salvo com histórico)' : '(somente neste navegador)'}. ${wb?.detail ?? ''} Nada é enviado a empresas.`);
     });
   };
-  const open = rows.find((r) => r.app.id === openId) ?? null;
+  // An application adopted into the store gets a new id; keep the drawer bound to the same job.
+  const [openJob, setOpenJob] = useState<string | null>(null);
+  const open = rows.find((r) => r.app.id === openId) ?? (openId && openJob ? rows.find((r) => r.app.jobId === openJob) : undefined) ?? null;
+  useEffect(() => {
+    if (open && open.app.jobId !== openJob) setOpenJob(open.app.jobId);
+  }, [open, openJob]);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(null);
@@ -244,7 +251,7 @@ export function Pipeline() {
               </label>
               <InfoNote tone="info" icon={<Info className="size-3.5" />}>
                 {persisted
-                  ? 'Mudanças de etapa são gravadas no servidor com histórico. O tracker do career-ops (applications.md) não é alterado — sincronização de volta via set-status.mjs é planejada.'
+                  ? 'Mudanças de etapa são gravadas no diário com histórico e aplicadas ao tracker do career-ops (fonte da verdade) via set-status.mjs — na hora, se o tracker estiver neste servidor; senão, no próximo npm run sync. Etapas sem equivalente no career-ops ficam só no diário. Veja o selo de cada evento abaixo.'
                   : 'Sem persistência no servidor: mudanças ficam só neste navegador.'}{' '}
                 Nada é enviado a empresas.
               </InfoNote>
@@ -265,7 +272,14 @@ export function Pipeline() {
                   {[...open.app.history].reverse().map((h, i) => (
                     <li key={i} className="relative">
                       <span className={cn('absolute top-1.5 -left-[21px] size-2.5 rounded-full border-2 border-bg-elevated', i === 0 ? 'bg-accent' : 'bg-border-strong')} />
-                      <div className="text-sm text-fg">{STAGE_LABEL[h.stage]}</div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-sm text-fg">
+                        {STAGE_LABEL[h.stage]}
+                        {h.sync && h.sync !== 'external' && (
+                          <StatusBadge tone={h.sync === 'applied' ? 'success' : h.sync === 'failed' ? 'danger' : h.sync === 'pending' ? 'warning' : 'neutral'} title={h.syncDetail ?? undefined}>
+                            {h.sync === 'applied' ? 'no tracker' : h.sync === 'failed' ? 'falha no tracker' : h.sync === 'pending' ? 'sincronização pendente' : 'só no diário'}
+                          </StatusBadge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted">
                         {fmtDate(h.at)}
                         {h.note ? ` · ${h.note}` : ''}

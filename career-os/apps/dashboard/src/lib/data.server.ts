@@ -1,16 +1,86 @@
 import 'server-only';
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, accessSync, constants } from 'node:fs';
 import { join as pathJoin, resolve } from 'node:path';
+import type { Dataset } from '@career-os/core';
 import { loadDataset, careerOpsDataPresent, resolveSource, careerOpsRoot } from '@career-os/core/server';
 
 const join = (...p: string[]) => pathJoin(/* turbopackIgnore: true */ ...p);
 
-export function getDataset() {
-  return loadDataset();
+export type ActiveSource = 'demo' | 'career-ops' | 'database';
+
+/**
+ * CAREER_OS_DATA_SOURCE = auto | demo | career-ops | database.
+ * auto: database when DATABASE_URL+CAREER_OS_OWNER_ID are set and the career-ops files are absent
+ * (the Vercel case); otherwise career-ops files if present; otherwise demo.
+ */
+export function activeSource(): ActiveSource {
+  const want = (process.env.CAREER_OS_DATA_SOURCE ?? 'auto').toLowerCase();
+  const dbReady = Boolean(process.env.DATABASE_URL && process.env.CAREER_OS_OWNER_ID);
+  if (want === 'database') return 'database';
+  if (want === 'auto' && dbReady && resolveSource() === 'demo') return 'database';
+  return resolveSource(want as 'demo' | 'career-ops' | 'auto');
+}
+
+export async function getDataset(): Promise<Dataset> {
+  if (activeSource() !== 'database') return loadDataset();
+  const notes: string[] = ['Fonte: banco de dados (espelho do career-ops via npm run radar -- --db).'];
+  const { DATABASE_URL, CAREER_OS_OWNER_ID } = process.env;
+  if (!DATABASE_URL || !CAREER_OS_OWNER_ID) throw new Error('CAREER_OS_DATA_SOURCE=database requer DATABASE_URL e CAREER_OS_OWNER_ID');
+  const dbm = await import('@career-os/db');
+  const db = sharedDb(dbm, DATABASE_URL);
+  const [jobs, snap] = await Promise.all([dbm.loadJobs(db, CAREER_OS_OWNER_ID), dbm.loadProfileSnapshot(db, CAREER_OS_OWNER_ID)]);
+  const base = loadDataset(); // only for the automation catalogue; never mixes demo jobs in
+  const profile = snap ?? {
+    ...base.profile,
+    origin: 'career-ops' as const,
+    displayName: 'Perfil não sincronizado',
+    headline: '—',
+    summary: 'Nenhum snapshot de perfil no banco. Rode npm run radar -- --db numa máquina com cv.md/profile.yml.',
+    yearsExperience: null,
+    currentSeniority: 'unknown' as const,
+    targetSeniority: [],
+    skills: [],
+    languages: [],
+    eligibility: [],
+    education: [],
+    experience: [],
+    achievements: [],
+    certifications: [],
+    preferences: { countries: {}, areas: {}, workModes: [], minAnnualSalaryEur: null },
+    goals: [],
+    importReport: { unknowns: ['Perfil não sincronizado no banco'], notes: [], sources: [] },
+  };
+  if (!snap) notes.push('Perfil ausente no banco — matching sem perfil (tudo desconhecido).');
+  if (!jobs.length) notes.push('Nenhuma vaga no banco — rode a ingestão com --db.');
+  return {
+    origin: 'career-ops',
+    asOf: new Date().toISOString().slice(0, 10),
+    jobs,
+    applications: [],
+    profile,
+    automations: base.automations,
+    runs: [],
+    sourceNotes: notes,
+  };
+}
+
+type DbModule = typeof import('@career-os/db');
+let pool: { url: string; db: ReturnType<DbModule['createDb']> } | null = null;
+function sharedDb(dbm: DbModule, url: string) {
+  if (!pool || pool.url !== url) pool = { url, db: dbm.createDb({ connectionString: url }) };
+  return pool.db;
 }
 
 export function getSourceStatus() {
-  return { active: resolveSource(), setting: process.env.CAREER_OS_DATA_SOURCE ?? 'auto', root: careerOpsRoot(), files: careerOpsDataPresent() };
+  return { active: activeSource(), setting: process.env.CAREER_OS_DATA_SOURCE ?? 'auto', root: careerOpsRoot(), files: careerOpsDataPresent() };
+}
+
+/** career-ops code dir (set-status.mjs) and data root, for tracker write-back. */
+export function careerOpsSyncConfig() {
+  return {
+    codeDir: resolve(/* turbopackIgnore: true */ process.env.CAREER_OPS_CODE_DIR ?? join(process.cwd(), '..', '..', 'upstream', 'career-ops')),
+    dataRoot: careerOpsRoot(),
+  };
 }
 
 /** Real list of CV templates shipped by career-ops (read at request time). */

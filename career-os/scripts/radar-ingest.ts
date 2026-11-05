@@ -47,13 +47,14 @@ async function main(): Promise<RunLog> {
   const errors: string[] = [];
   const stats: Record<string, unknown> = { careerOpsRoot: CO };
 
-  if (!existsSync(join(CO, 'package.json'))) throw new Error(`career-ops not found at ${CO}`);
+  // CO is a career-ops DATA root (may differ from the code dir): it only needs to exist.
+  if (!existsSync(CO)) throw new Error(`career-ops data root not found: ${CO}`);
 
   if (flag('--scan')) {
     if (!existsSync(join(CO, 'portals.yml'))) {
       errors.push('scan skipped: portals.yml not configured (copy templates/portals.example.yml and customize)');
     } else {
-      const r = spawnSync(process.execPath, ['scan.mjs', '--quiet'], { cwd: CO, encoding: 'utf8', timeout: 15 * 60_000 });
+      const r = spawnSync(process.execPath, ['scan.mjs', '--quiet'], { cwd: join(ROOT, 'upstream', 'career-ops'), env: { ...process.env, CAREER_OPS_ROOT: CO }, encoding: 'utf8', timeout: 15 * 60_000 });
       stats.scanExitCode = r.status;
       const tail = (r.stderr || r.stdout || '').trim().split('\n').slice(-5).join(' | ');
       if (r.status !== 0) errors.push(`scan.mjs exited ${r.status}: ${tail.slice(0, 500)}`);
@@ -93,10 +94,40 @@ async function main(): Promise<RunLog> {
     if (!DATABASE_URL || !CAREER_OS_OWNER_ID) {
       errors.push('--db requested but DATABASE_URL / CAREER_OS_OWNER_ID are not set; database mirror skipped');
     } else {
-      const { createDb, upsertIngestedJobs } = await import('@career-os/db');
+      const { createDb, upsertIngestedJobs, upsertProfileSnapshot } = await import('@career-os/db');
       const db = createDb({ connectionString: DATABASE_URL });
       try {
-        stats.db = await upsertIngestedJobs(db, CAREER_OS_OWNER_ID, jobs);
+        const up = await upsertIngestedJobs(db, CAREER_OS_OWNER_ID, jobs);
+        stats.db = { inserted: up.inserted, updated: up.updated, failed: up.failed.length };
+        for (const f of up.failed) errors.push(`linha rejeitada pelo banco (${f.jobId}): ${f.error}`);
+        // tracker applications → journal (imported history, actor 'import'); idempotent.
+        // Later tracker changes reach the journal through `npm run sync` (pull).
+        const { PostgresPipelineStore } = await import('@career-os/db');
+        const store = new PostgresPipelineStore(db, CAREER_OS_OWNER_ID);
+        let adopted = 0;
+        for (const app of tracker.applications) {
+          const job = jobs.find((n) => n.job.id === app.jobId)?.job;
+          if (!job) continue;
+          try {
+            const r = await store.add(job, { seedHistory: app.history });
+            if (r.created) adopted++;
+          } catch (e) {
+            errors.push(`candidatura ${app.id} não espelhada: ${(e as Error).message}`);
+          }
+        }
+        stats.applicationsAdopted = adopted;
+        // profile snapshot for deployments without career-ops files (Vercel)
+        const cv = read('cv.md');
+        const yml = read('config/profile.yml');
+        if (cv || yml) {
+          const { buildProfileFromCareerOps } = await import('@career-os/core/server');
+          const extPath = join(OUT, 'profile-extension.yml');
+          const imp = buildProfileFromCareerOps(cv, yml, existsSync(extPath) ? readFileSync(extPath, 'utf8') : null);
+          const snap = await upsertProfileSnapshot(db, CAREER_OS_OWNER_ID, { ...imp.profile, importReport: { unknowns: imp.unknowns, notes: imp.notes, sources: imp.sources } });
+          stats.profileSnapshot = snap.hash;
+        } else {
+          stats.profileSnapshot = 'skipped (sem cv.md/profile.yml)';
+        }
       } catch (e) {
         errors.push(`database mirror failed: ${(e as Error).message}`);
       } finally {

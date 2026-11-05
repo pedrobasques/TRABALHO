@@ -29,7 +29,14 @@ export interface PersistenceStatus {
   detail: string;
 }
 
-export type ActionResult = { ok: true; created?: boolean } | { ok: false; error: string };
+export interface WriteBackInfo {
+  attempted: boolean;
+  applied: number;
+  failed: number;
+  detail: string;
+}
+
+export type ActionResult = { ok: true; created?: boolean; writeBack?: WriteBackInfo | null } | { ok: false; error: string };
 
 interface Store {
   base: Dataset;
@@ -139,14 +146,15 @@ export function DataProvider({ dataset: base, children }: { dataset: Dataset; ch
     addToPipeline: async (jobId) => {
       if (serverMode) {
         try {
-          const r = await api<{ application: StoredApplication; created: boolean }>('/api/pipeline', { method: 'POST', body: JSON.stringify({ jobId }) });
+          const r = await api<{ application: StoredApplication; created: boolean; writeBack: WriteBackInfo | null }>('/api/pipeline', { method: 'POST', body: JSON.stringify({ jobId }) });
           upsertStored(r.application);
-          return { ok: true, created: r.created };
+          return { ok: true, created: r.created, writeBack: r.writeBack };
         } catch (e) {
           return { ok: false, error: (e as Error).message };
         }
       }
       if (persistence.kind === 'loading') return { ok: false, error: 'Persistência ainda carregando; tente novamente.' };
+      if (persistence.kind === 'error') return { ok: false, error: persistence.detail };
       if (dataset.applications.some((a) => a.jobId === jobId)) return { ok: true, created: false };
       const app: Application = {
         id: `local-${jobId}`,
@@ -167,14 +175,16 @@ export function DataProvider({ dataset: base, children }: { dataset: Dataset; ch
       if (cur.stage === stage) return { ok: true };
       if (serverMode) {
         try {
-          const r = await api<{ application: StoredApplication }>(`/api/pipeline/${encodeURIComponent(cur.jobId)}`, { method: 'PATCH', body: JSON.stringify({ stage }) });
+          const r = await api<{ application?: StoredApplication; writeBack: WriteBackInfo }>(`/api/pipeline/${encodeURIComponent(cur.jobId)}`, { method: 'PATCH', body: JSON.stringify({ stage }) });
+          if (!r.application) throw new Error('Resposta sem a candidatura gravada');
           upsertStored(r.application);
-          return { ok: true };
+          return { ok: true, writeBack: r.writeBack };
         } catch (e) {
           return { ok: false, error: (e as Error).message };
         }
       }
       if (persistence.kind === 'loading') return { ok: false, error: 'Persistência ainda carregando; tente novamente.' };
+      if (persistence.kind === 'error') return { ok: false, error: persistence.detail };
       const ev: StageEvent = { stage, at: base.asOf, note: 'Movida neste navegador' };
       persist({ ...overlay, moves: { ...overlay.moves, [appId]: [...(overlay.moves[appId] ?? []), ev] } });
       return { ok: true };

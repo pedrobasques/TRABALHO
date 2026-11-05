@@ -2,3 +2,4 @@ export { createDb, withUser, setEventContext, isUuid, type Db, type Tx } from '.
 export { PostgresPipelineStore } from './pipeline-store.ts';
 export { runMigrations, type MigrationResult } from './migrate.ts';
 export { upsertIngestedJobs, recordAutomationRun, type IngestUpsertResult } from './ingest-store.ts';
+export { loadJobs, loadProfileSnapshot, upsertProfileSnapshot, profileHash } from './dataset.ts';

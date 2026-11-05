@@ -80,7 +80,19 @@ export function JobRadar() {
   const active = isFilterActive(filter) || favOnly;
 
   const columns: Column<JobRow>[] = [
-    { key: 'score', header: 'Score', sortValue: (r) => r.match.overallScore, cell: (r) => <ScoreIndicator score={r.match.overallScore} size="sm" blocked={r.match.category === 'blocked'} /> },
+    {
+      key: 'score',
+      header: 'Score',
+      sortValue: (r) => r.match.overallScore,
+      cell: (r) => (
+        <div className="relative inline-flex">
+          <ScoreIndicator score={r.match.overallScore} size="sm" blocked={r.match.category === 'blocked'} />
+          {r.match.category !== 'blocked' && r.match.eligibilityStatus !== 'eligible' && (
+            <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full border-2 border-surface bg-warning" title="Elegibilidade de trabalho pendente — o score não a inclui" aria-label="elegibilidade pendente" />
+          )}
+        </div>
+      ),
+    },
     {
       key: 'title',
       header: 'Vaga',

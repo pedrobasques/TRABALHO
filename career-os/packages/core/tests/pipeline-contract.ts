@@ -88,6 +88,24 @@ export function runPipelineContract(name: string, make: () => Promise<PipelineSt
     });
   }
 
+  test(`${name}: dashboard events are pending write-back; imported history is not; markSync clears`, async () => {
+    const s = await make();
+    await s.add(j2, { seedHistory: [{ stage: 'discovered', at: '2026-10-01' }, { stage: 'qualified', at: '2026-10-02' }] });
+    assert.equal((await s.pendingSync()).length, 0, 'imported events are external');
+    await s.move(j2.id, 'submitted', 'enviada');
+    const pend = await s.pendingSync();
+    assert.equal(pend.length, 1);
+    assert.equal(pend[0]!.event.to, 'submitted');
+    await s.markSync(pend[0]!.event.id, 'failed', 'tracker locked');
+    assert.equal((await s.pendingSync()).length, 1, 'failed events are retried');
+    await s.markSync(pend[0]!.event.id, 'applied', 'ok');
+    assert.equal((await s.pendingSync()).length, 0);
+    const ev = (await s.events(j2.id)).at(-1)!;
+    assert.equal(ev.sync?.state, 'applied');
+    await s.move(j2.id, 'interview', 'from tracker', 'career-ops');
+    assert.equal((await s.pendingSync()).length, 0, 'career-ops-originated moves never need write-back');
+  });
+
   test(`${name}: concurrent moves do not lose events`, async () => {
     const s = await make();
     await s.add(j1);

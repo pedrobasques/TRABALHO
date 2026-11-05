@@ -34,7 +34,7 @@ Digite uma senha (≥ 12 caracteres). Copie as duas linhas `CAREER_OS_PASSWORD_H
 |---|---|
 | `CAREER_OS_PASSWORD_HASH` | do passo 1 |
 | `CAREER_OS_SESSION_SECRET` | do passo 1 |
-| `CAREER_OS_DATA_SOURCE` | `demo` (até haver espelho de vagas no banco como fonte) |
+| `CAREER_OS_DATA_SOURCE` | `database` (com Supabase; vagas e perfil vêm do banco) ou `demo` (sem banco) |
 | `CAREER_OS_STORE` | `auto` |
 
 Sem banco, o pipeline mostra "Só navegador" (nada é fingido como persistido).
@@ -60,3 +60,17 @@ career-ops nem dados pessoais. O modo `career-ops` só funciona em host próprio
 ## Custos
 Vercel Hobby e Supabase Free: US$ 0 dentro dos limites (Supabase pausa projetos Free inativos por 7 dias).
 Ver `docs/HOSTING.md`.
+
+## Modo banco (sessão 4) — o que roda onde
+| Onde | Comando | Papel |
+|---|---|---|
+| Sua máquina (tem os arquivos do career-ops) | `npm run radar -- --scan --db` | coleta, normaliza, espelha vagas + perfil + candidaturas no Supabase |
+| Vercel | dashboard com `CAREER_OS_DATA_SOURCE=database` | lê vagas/perfil do banco; movimentações ficam **pendentes de sincronização** |
+| Sua máquina | `npm run sync -- --db` | aplica os pendentes ao tracker via `set-status.mjs` e traz mudanças do tracker |
+
+## Verificação do deploy (antes de usar)
+```bash
+node scripts/verify-deploy.mjs https://<seu-projeto>.vercel.app
+```
+Resultado esperado: com Vercel Authentication ativa → `PASS Vercel Authentication`; sem ela → todas as verificações do login
+do app em PASS. Qualquer `FAIL` em "sem exposição anônima" = não usar e corrigir antes.

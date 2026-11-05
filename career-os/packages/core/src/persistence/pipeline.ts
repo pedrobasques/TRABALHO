@@ -17,6 +17,16 @@ export function isStage(v: unknown): v is PipelineStage {
   return typeof v === 'string' && (ALL_STAGES as readonly string[]).includes(v);
 }
 
+/**
+ * Write-back state of a dashboard event towards the canonical career-ops tracker (ADR-008).
+ *  pending        — not yet applied to data/applications.md
+ *  applied        — applied via set-status.mjs (detail = resulting tracker state)
+ *  not_applicable — no career-ops equivalent (e.g. "preparing"), or job has no tracker row; journal-only
+ *  failed         — last attempt failed (detail = reason); retried by the next sync
+ *  external       — the event itself came from career-ops (import / pull); nothing to write back
+ */
+export type SyncState = 'pending' | 'applied' | 'not_applicable' | 'failed' | 'external';
+
 export interface PipelineEvent {
   id: string;
   from: PipelineStage | null;
@@ -24,6 +34,12 @@ export interface PipelineEvent {
   at: string;
   note: string | null;
   actor: string;
+  sync?: { state: SyncState; at: string | null; detail: string | null };
+}
+
+export interface PendingEvent {
+  application: StoredApplication;
+  event: PipelineEvent;
 }
 
 /** Minimal job snapshot stored with the application (the job itself stays in its source). */
@@ -77,6 +93,14 @@ export interface PipelineStore {
   add(job: Job, opts?: AddOptions): Promise<{ application: StoredApplication; created: boolean }>;
   move(jobId: string, to: PipelineStage, note?: string, actor?: string): Promise<StoredApplication>;
   events(jobId: string): Promise<PipelineEvent[]>;
+  /** Dashboard events not yet applied to career-ops (state pending or failed), oldest first. */
+  pendingSync(): Promise<PendingEvent[]>;
+  markSync(eventId: string, state: Exclude<SyncState, 'pending'>, detail?: string | null): Promise<void>;
+}
+
+/** Events written by career-ops itself never need write-back. */
+export function initialSyncState(actor: string): SyncState {
+  return actor === 'import' || actor === 'career-ops' ? 'external' : 'pending';
 }
 
 export function snapshotOf(job: Job): JobSnapshot {
@@ -103,7 +127,14 @@ export function toApplication(s: StoredApplication): Application {
     origin: s.origin,
     jobId: s.job.jobId,
     stage: s.stage,
-    history: s.events.map((e) => ({ stage: e.to, at: e.at, ...(e.note ? { note: e.note } : {}) })),
+    history: s.events.map((e) => ({
+      stage: e.to,
+      at: e.at,
+      actor: e.actor,
+      sync: e.sync?.state ?? initialSyncState(e.actor),
+      syncDetail: e.sync?.detail ?? null,
+      ...(e.note ? { note: e.note } : {}),
+    })),
     nextAction: s.nextAction,
     nextActionDue: null,
     notes: s.notes,
@@ -133,8 +164,8 @@ export class PipelineState {
     const actor = opts.actor ?? 'dashboard';
     const seed = (opts.seedHistory ?? []).filter((e) => isStage(e.stage));
     const events: PipelineEvent[] = seed.length
-      ? seed.map((e, i) => ({ id: newId('evt'), from: i === 0 ? null : seed[i - 1]!.stage, to: e.stage, at: e.at, note: e.note ?? null, actor: 'import' }))
-      : [{ id: newId('evt'), from: null, to: 'discovered', at: now, note: opts.note ?? null, actor }];
+      ? seed.map((e, i) => ({ id: newId('evt'), from: i === 0 ? null : seed[i - 1]!.stage, to: e.stage, at: e.at, note: e.note ?? null, actor: 'import', sync: { state: 'external' as SyncState, at: null, detail: null } }))
+      : [{ id: newId('evt'), from: null, to: 'discovered', at: now, note: opts.note ?? null, actor, sync: { state: initialSyncState(actor), at: null, detail: null } }];
     const app: StoredApplication = {
       id: newId('app'),
       job: snap,
@@ -156,10 +187,32 @@ export class PipelineState {
     const app = this.find(jobId);
     if (!app) throw new PipelineError('not_found', `job ${jobId} is not in the pipeline`);
     if (app.stage === to) return app;
-    app.events.push({ id: newId('evt'), from: app.stage, to, at: now, note: note ?? null, actor });
+    app.events.push({ id: newId('evt'), from: app.stage, to, at: now, note: note ?? null, actor, sync: { state: initialSyncState(actor), at: null, detail: null } });
     app.stage = to;
     app.updatedAt = now;
     return app;
+  }
+
+  pendingSync(): PendingEvent[] {
+    const out: PendingEvent[] = [];
+    for (const application of this.apps) {
+      for (const event of application.events) {
+        const st = event.sync?.state ?? initialSyncState(event.actor);
+        if (st === 'pending' || st === 'failed') out.push({ application, event });
+      }
+    }
+    return out.sort((a, b) => a.event.at.localeCompare(b.event.at));
+  }
+
+  markSync(eventId: string, state: Exclude<SyncState, 'pending'>, detail: string | null = null, now = new Date().toISOString()): void {
+    for (const a of this.apps) {
+      const e = a.events.find((x) => x.id === eventId);
+      if (e) {
+        e.sync = { state, at: now, detail };
+        return;
+      }
+    }
+    throw new PipelineError('not_found', `event ${eventId} not found`);
   }
 
   events(jobId: string): PipelineEvent[] {
@@ -186,5 +239,11 @@ export class InMemoryPipelineStore implements PipelineStore {
   }
   async events(jobId: string) {
     return clone(this.state.events(jobId));
+  }
+  async pendingSync() {
+    return clone(this.state.pendingSync());
+  }
+  async markSync(eventId: string, state: Exclude<SyncState, 'pending'>, detail?: string | null) {
+    this.state.markSync(eventId, state, detail ?? null);
   }
 }
