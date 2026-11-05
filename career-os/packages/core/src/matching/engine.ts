@@ -82,6 +82,7 @@ export interface MatchResult {
 }
 
 const norm = (s: string) => s.trim().toLowerCase();
+const PROV: Record<string, string> = { proven: 'comprovado', declared: 'declarado', interpretation: 'interpretação', pending_validation: 'pendente de validação' };
 const clamp = (n: number, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, n));
 
 function seniorityIndex(s: Seniority): number | null {
@@ -98,25 +99,25 @@ export function evaluateEligibility(
 ): { status: EligibilityStatus; detail: string } {
   const entry = profile.eligibility.find((e) => e.country === country);
   if (!entry || entry.status === 'unknown') {
-    return { status: 'unknown', detail: `Work authorisation for ${country} not documented.` };
+    return { status: 'unknown', detail: `Autorização de trabalho para ${country} não documentada.` };
   }
   if (entry.status === 'authorized') {
-    return { status: 'eligible', detail: `Authorised to work in ${country}${entry.basis ? ` (${entry.basis})` : ''}.` };
+    return { status: 'eligible', detail: `Autorizado a trabalhar em ${country}${entry.basis ? ` (${entry.basis})` : ''}.` };
   }
   if (entry.status === 'in_progress') {
     return {
       status: 'unknown',
-      detail: `Authorisation for ${country} in progress${entry.basis ? ` (${entry.basis})` : ''} — not yet valid.`,
+      detail: `Autorização para ${country} em andamento${entry.basis ? ` (${entry.basis})` : ''} — ainda não válida.`,
     };
   }
   // not_authorized
   if (job.visaSponsorship === 'offered') {
-    return { status: 'requires_sponsorship', detail: `No authorisation for ${country}; employer states it sponsors visas.` };
+    return { status: 'requires_sponsorship', detail: `Sem autorização para ${country}; o empregador declara patrocinar visto.` };
   }
   if (job.visaSponsorship === 'not_offered') {
-    return { status: 'not_eligible', detail: `No authorisation for ${country} and the posting excludes sponsorship.` };
+    return { status: 'not_eligible', detail: `Sem autorização para ${country} e a vaga exclui patrocínio de visto.` };
   }
-  return { status: 'unknown', detail: `No authorisation for ${country}; sponsorship not stated in the posting.` };
+  return { status: 'unknown', detail: `Sem autorização para ${country}; patrocínio não informado na vaga.` };
 }
 
 function findSkill(profile: CandidateProfile, key: string) {
@@ -128,46 +129,46 @@ export function evaluateRequirement(req: Requirement, job: Job, profile: Candida
   const r = (status: RequirementStatus, reason: string): RequirementResult => ({ requirement: req, status, reason });
   switch (req.category) {
     case 'skill': {
-      if (!req.key) return r('unknown', 'Requirement not mapped to a known skill.');
+      if (!req.key) return r('unknown', 'Requisito não mapeado para uma competência conhecida.');
       const s = findSkill(profile, req.key);
-      if (!s) return r('not_met', 'Not present in profile.');
-      if (s.provenance === 'pending_validation') return r('unknown', `"${s.label}" is in the profile but pending validation.`);
-      return r('met', `"${s.label}" (${s.provenance}, level ${s.level}/5).`);
+      if (!s) return r('not_met', 'Não consta no perfil.');
+      if (s.provenance === 'pending_validation') return r('unknown', `"${s.label}" consta no perfil, mas está pendente de validação.`);
+      return r('met', `"${s.label}" (${PROV[s.provenance]}, nível ${s.level}/5).`);
     }
     case 'certification': {
-      if (!req.key) return r('unknown', 'Certification not mapped.');
+      if (!req.key) return r('unknown', 'Certificação não mapeada.');
       const c = profile.certifications.find((x) => norm(x.key) === norm(req.key!));
-      if (!c) return r('not_met', 'Certification not in profile.');
-      if (c.provenance === 'pending_validation') return r('unknown', `"${c.label}" pending validation.`);
-      return r('met', `"${c.label}" (${c.provenance}).`);
+      if (!c) return r('not_met', 'Certificação não consta no perfil.');
+      if (c.provenance === 'pending_validation') return r('unknown', `"${c.label}" pendente de validação.`);
+      return r('met', `"${c.label}" (${PROV[c.provenance]}).`);
     }
     case 'education': {
-      if (!req.key) return r('unknown', 'Degree requirement not mapped.');
+      if (!req.key) return r('unknown', 'Requisito de formação não mapeado.');
       const e = profile.education.find((x) => norm(x.key) === norm(req.key!));
-      if (!e) return r('not_met', 'Degree not in profile.');
+      if (!e) return r('not_met', 'Formação não consta no perfil.');
       if (e.status !== 'completed' || e.provenance === 'pending_validation') {
-        return r('unknown', `"${e.degree}" status ${e.status} / ${e.provenance} — confirm before claiming.`);
+        return r('unknown', `"${e.degree}": situação ${e.status === 'in_progress' ? 'em andamento' : 'não verificada'} / ${PROV[e.provenance]} — confirmar antes de declarar.`);
       }
       return r('met', `"${e.degree}" — ${e.institution}.`);
     }
     case 'experience': {
-      if (req.minYears == null) return r('unknown', 'No minimum stated.');
-      if (profile.yearsExperience == null) return r('unknown', 'Years of experience not documented in profile.');
+      if (req.minYears == null) return r('unknown', 'Mínimo não informado.');
+      if (profile.yearsExperience == null) return r('unknown', 'Anos de experiência não documentados no perfil.');
       return profile.yearsExperience >= req.minYears
-        ? r('met', `${profile.yearsExperience} years ≥ ${req.minYears}.`)
-        : r('not_met', `${profile.yearsExperience} years < ${req.minYears}.`);
+        ? r('met', `${profile.yearsExperience} anos ≥ ${req.minYears}.`)
+        : r('not_met', `${profile.yearsExperience} anos < ${req.minYears}.`);
     }
     case 'language': {
-      if (!req.language) return r('unknown', 'Language not specified.');
+      if (!req.language) return r('unknown', 'Idioma não especificado.');
       const l = profile.languages.find((x) => norm(x.code) === norm(req.language!.code));
-      if (!l) return r('not_met', `${req.language.code.toUpperCase()} not in profile.`);
-      if (l.level == null) return r('unknown', `${l.label}: level not documented.`);
+      if (!l) return r('not_met', `${req.language.code.toUpperCase()} não consta no perfil.`);
+      if (l.level == null) return r('unknown', `${l.label}: nível não documentado.`);
       const have = LANGUAGE_LEVEL_ORDER.indexOf(l.level);
       const need = LANGUAGE_LEVEL_ORDER.indexOf(req.language.level);
-      const tag = l.provenance === 'pending_validation' ? ' (pending validation)' : '';
+      const tag = l.provenance === 'pending_validation' ? ' (pendente de validação)' : '';
       if (have >= need) {
         return l.provenance === 'pending_validation'
-          ? r('unknown', `${l.label} ${l.level}${tag} vs ${req.language.level} required.`)
+          ? r('unknown', `${l.label} ${l.level}${tag} vs ${req.language.level} exigido.`)
           : r('met', `${l.label} ${l.level} ≥ ${req.language.level}.`);
       }
       return r('not_met', `${l.label} ${l.level}${tag} < ${req.language.level}.`);
@@ -208,20 +209,20 @@ export function detectDataIssues(job: Job): string[] {
   const issues: string[] = [];
   if (job.salary) {
     const { min, max } = job.salary;
-    if (min != null && max != null && min > max) issues.push('Salary minimum is greater than maximum.');
-    if ((min != null && min < 0) || (max != null && max < 0)) issues.push('Negative salary value.');
+    if (min != null && max != null && min > max) issues.push('Salário mínimo maior que o máximo.');
+    if ((min != null && min < 0) || (max != null && max < 0)) issues.push('Valor de salário negativo.');
   }
   for (const r of job.requirements) {
-    if (r.minYears != null && (r.minYears < 0 || r.minYears > 50)) issues.push(`Implausible years requirement (${r.minYears}).`);
+    if (r.minYears != null && (r.minYears < 0 || r.minYears > 50)) issues.push(`Requisito de anos implausível (${r.minYears}).`);
   }
   if (job.postedAt && job.verifiedAt && job.verifiedAt < job.postedAt) {
-    issues.push('Verification date precedes publication date.');
+    issues.push('Data de verificação anterior à publicação.');
   }
   if (job.postedAt && job.postedAt > job.discoveredAt.slice(0, 10) && job.postedAt > (job.verifiedAt ?? job.discoveredAt)) {
-    issues.push('Publication date is after discovery date.');
+    issues.push('Data de publicação posterior à descoberta.');
   }
   if (job.careerOpsScore != null && (job.careerOpsScore < 1 || job.careerOpsScore > 5)) {
-    issues.push(`career-ops score ${job.careerOpsScore} outside the 1–5 scale.`);
+    issues.push(`Nota career-ops ${job.careerOpsScore} fora da escala 1–5.`);
   }
   return issues;
 }
@@ -242,49 +243,49 @@ export function matchJob(job: Job, profile: CandidateProfile, config: MatchingCo
   // technical: skills, certifications, education
   const tech = byCat('skill', 'certification', 'education');
   const technical = weightedFraction(tech, cfg);
-  add('technical', technical, tech.length ? `${tech.filter((t) => t.status === 'met').length}/${tech.length} technical requirements met` : 'No technical requirements stated');
+  add('technical', technical, tech.length ? `${tech.filter((t) => t.status === 'met').length}/${tech.length} requisitos técnicos atendidos` : 'Nenhum requisito técnico informado');
 
   const exp = byCat('experience');
-  add('experience', weightedFraction(exp, cfg), exp.length ? exp.map((e) => e.reason).join(' ') : 'No experience requirement stated');
+  add('experience', weightedFraction(exp, cfg), exp.length ? exp.map((e) => e.reason).join(' ') : 'Nenhum requisito de experiência informado');
 
   const lang = byCat('language');
-  add('language', weightedFraction(lang, cfg), lang.length ? lang.map((e) => e.reason).join(' ') : 'No language requirement stated');
+  add('language', weightedFraction(lang, cfg), lang.length ? lang.map((e) => e.reason).join(' ') : 'Nenhum requisito de idioma informado');
 
   const areaPriority = profile.preferences.areas[job.area] ?? cfg.defaultAreaPriority;
-  add('area', areaPriority * 100, `Area "${job.area}" priority ${Math.round(areaPriority * 100)}%`);
+  add('area', areaPriority * 100, `Prioridade da área: ${Math.round(areaPriority * 100)}%`);
 
   const jobSen = seniorityIndex(job.seniority);
   if (jobSen == null) {
-    add('seniority', null, 'Seniority not stated');
+    add('seniority', null, 'Senioridade não informada');
   } else {
     const targets = profile.targetSeniority.map(seniorityIndex).filter((x): x is number => x != null);
     const dist = targets.length ? Math.min(...targets.map((t) => Math.abs(t - jobSen))) : null;
-    add('seniority', dist == null ? null : dist === 0 ? 100 : dist === 1 ? 60 : 20, `Job level ${job.seniority}; targets ${profile.targetSeniority.join(', ') || 'not set'}`);
+    add('seniority', dist == null ? null : dist === 0 ? 100 : dist === 1 ? 60 : 20, `Nível da vaga ${job.seniority}; alvo ${profile.targetSeniority.join(', ') || 'não definido'}`);
   }
 
   const countryPriority = profile.preferences.countries[job.country] ?? cfg.defaultCountryPriority;
   const modeOk = job.workMode === 'unknown' || profile.preferences.workModes.length === 0 || profile.preferences.workModes.includes(job.workMode);
-  add('location', countryPriority * 100 * (modeOk ? 1 : 0.8), `${job.country} priority ${Math.round(countryPriority * 100)}%; ${job.workMode}${modeOk ? '' : ' (not a preferred work mode)'}`);
+  add('location', countryPriority * 100 * (modeOk ? 1 : 0.8), `Prioridade de ${job.country}: ${Math.round(countryPriority * 100)}%; modalidade ${job.workMode}${modeOk ? '' : ' (não preferida)'}`);
 
   const cur = seniorityIndex(profile.currentSeniority);
   if (jobSen == null || cur == null) {
-    add('career', null, 'Cannot assess progression (seniority unknown)');
+    add('career', null, 'Progressão não avaliável (senioridade desconhecida)');
   } else {
     const step = jobSen - cur;
     const progression = step >= 1 && step <= 2 ? 100 : step === 0 ? 70 : step > 2 ? 50 : 30;
-    add('career', 0.7 * progression + 0.3 * areaPriority * 100, step > 0 ? `Step up of ${step} level(s)` : step === 0 ? 'Lateral move' : 'Step down');
+    add('career', 0.7 * progression + 0.3 * areaPriority * 100, step > 0 ? `Avanço de ${step} nível(is)` : step === 0 ? 'Movimento lateral' : 'Recuo de nível');
   }
 
   if (!job.salary || profile.preferences.minAnnualSalaryEur == null) {
-    add('compensation', null, job.salary ? 'Salary floor not set in preferences' : 'Salary not published');
+    add('compensation', null, job.salary ? 'Piso salarial não definido nas preferências' : 'Salário não publicado');
   } else {
     const { min, max, currency, period } = job.salary;
     const top = Math.max(min ?? -Infinity, max ?? -Infinity);
     const annual = Number.isFinite(top) ? toAnnualEur(top, currency, period, cfg) : null;
-    if (annual == null) add('compensation', null, `Cannot convert ${currency}`);
+    if (annual == null) add('compensation', null, `Conversão de ${currency} indisponível`);
     else {
       const ratio = annual / profile.preferences.minAnnualSalaryEur;
-      add('compensation', ratio >= 1 ? 100 : ratio >= 0.85 ? 60 : 20, `≈ €${Math.round(annual / 1000)}k/yr vs floor €${Math.round(profile.preferences.minAnnualSalaryEur / 1000)}k`);
+      add('compensation', ratio >= 1 ? 100 : ratio >= 0.85 ? 60 : 20, `≈ €${Math.round(annual / 1000)}k/ano vs piso €${Math.round(profile.preferences.minAnnualSalaryEur / 1000)}k`);
     }
   }
 
@@ -310,7 +311,7 @@ export function matchJob(job: Job, profile: CandidateProfile, config: MatchingCo
   for (const x of missing) {
     if (x.requirement.kind !== 'must') continue;
     if (x.requirement.category === 'eligibility' && !blockers.includes(x.reason)) blockers.push(x.reason);
-    if (x.requirement.category === 'language') blockers.push(`Mandatory language: ${x.requirement.text} — ${x.reason}`);
+    if (x.requirement.category === 'language') blockers.push(`Idioma obrigatório: ${x.requirement.text} — ${x.reason}`);
   }
   const eligibilityReqUnknown = reqResults.some((x) => x.requirement.category === 'eligibility' && x.status === 'unknown');
   // An explicit, unmet eligibility requirement (e.g. "EU work permit required") overrides the country-level view.
@@ -357,17 +358,17 @@ export function matchJob(job: Job, profile: CandidateProfile, config: MatchingCo
   else recommendation = 'low_priority';
 
   const explanation: string[] = [];
-  explanation.push(`Fit score ${overall}/100 from ${evaluable.length} of ${components.length} evaluable components (config ${cfg.version}).`);
-  if (matched.length) explanation.push(`${matched.length} requirement(s) met.`);
-  if (missingMustTech.length) explanation.push(`${missingMustTech.length} mandatory requirement(s) not met (−${cfg.missingMustPenalty} each).`);
-  if (unknown.length) explanation.push(`${unknown.length} requirement(s) could not be verified — treated as unknown, not as met.`);
-  if (blockers.length) explanation.push(`Blocked: ${blockers.join(' ')}`);
-  else explanation.push(`Eligibility: ${eligibility.detail}`);
+  explanation.push(`Score de aderência ${overall}/100 a partir de ${evaluable.length} de ${components.length} componentes avaliáveis (config ${cfg.version}).`);
+  if (matched.length) explanation.push(`${matched.length} requisito(s) atendido(s).`);
+  if (missingMustTech.length) explanation.push(`${missingMustTech.length} requisito(s) obrigatório(s) não atendido(s) (−${cfg.missingMustPenalty} cada).`);
+  if (unknown.length) explanation.push(`${unknown.length} requisito(s) não verificável(is) — tratados como desconhecidos, não como atendidos.`);
+  if (blockers.length) explanation.push(`Bloqueada: ${blockers.join(' ')}`);
+  else explanation.push(`Elegibilidade: ${eligibility.detail}`);
   const skipped = components.filter((c) => c.value == null).map((c) => c.key);
-  if (skipped.length) explanation.push(`Not evaluated (missing data): ${skipped.join(', ')}.`);
-  if (insufficient) explanation.push('Insufficient data for a strong recommendation — category capped at "moderate".');
-  if (dataIssues.length) explanation.push(`Data issues: ${dataIssues.join(' ')}`);
-  if (job.careerOpsScore != null) explanation.push(`career-ops report score: ${job.careerOpsScore}/5 (shown separately, not merged).`);
+  if (skipped.length) explanation.push(`Não avaliado (dados ausentes): ${skipped.join(', ')}.`);
+  if (insufficient) explanation.push('Dados insuficientes para recomendação forte — categoria limitada a "moderada".');
+  if (dataIssues.length) explanation.push(`Inconsistências: ${dataIssues.join(' ')}`);
+  if (job.careerOpsScore != null) explanation.push(`Nota do relatório career-ops: ${job.careerOpsScore}/5 (exibida separadamente, não somada).`);
 
   const technicalScore = technical == null ? null : Math.round(clamp(technical));
   const careerC = components.find((c) => c.key === 'career')!;

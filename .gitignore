@@ -12,3 +12,4 @@ coverage/
 *.log
 # Career OS private data store (never in git)
 career-os/private/
+*.tsbuildinfo

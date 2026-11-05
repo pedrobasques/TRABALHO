@@ -7,7 +7,10 @@
  *   auto        — career-ops if data/applications.md or data/scan-history.tsv exists, else demo
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join as pathJoin, resolve } from 'node:path';
+
+/** Runtime-only path join (user data is read at request time, never bundled). */
+const join = (...parts: string[]) => pathJoin(/* turbopackIgnore: true */ ...parts);
 import type { CandidateProfile, Dataset } from './domain/types.ts';
 import { buildDemoDataset } from './data/demo/index.ts';
 import { DEMO_PROFILE } from './data/demo/profile.ts';
@@ -17,7 +20,7 @@ import { AUTOMATION_CATALOG } from './automation/catalog.ts';
 export type SourceSetting = 'demo' | 'career-ops' | 'auto';
 
 export function careerOpsRoot(): string {
-  return resolve(process.env.CAREER_OPS_ROOT ?? join(process.cwd(), '..', '..', 'upstream', 'career-ops'));
+  return resolve(/* turbopackIgnore: true */ process.env.CAREER_OPS_ROOT ?? join(process.cwd(), '..', '..', 'upstream', 'career-ops'));
 }
 
 export function careerOpsDataPresent(root = careerOpsRoot()): { applications: boolean; scanHistory: boolean; cv: boolean; profile: boolean } {
