@@ -20,6 +20,7 @@ import {
   trackerToDomain,
   weeklyTimeline,
   inPeriod,
+  countryName,
   type JobRow,
 } from '../src/index.ts';
 
@@ -173,6 +174,15 @@ test('scan-history.tsv → jobs, header and junk skipped, formula escape undone'
   assert.equal(jobs[1]!.title, '=Formula Title');
   assert.equal(jobs[1]!.status, 'closed');
   assert.equal(jobs[1]!.workMode, 'remote');
+});
+
+test('legacy 3-column scan-history (career-ops ≤ v1.18) is read correctly', () => {
+  const jobs = scanHistoryToJobs('https://boards.example.test/acme/jobs/1\t2026-06-19\tSenior Platform Engineer\n');
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0]!.title, 'Senior Platform Engineer');
+  assert.equal(jobs[0]!.company, 'Empresa não informada');
+  assert.equal(jobs[0]!.discoveredAt, '2026-06-19');
+  assert.equal(countryName(jobs[0]!.country), 'País não informado');
 });
 
 test('empty / missing inputs are safe', () => {

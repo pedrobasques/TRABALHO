@@ -121,6 +121,7 @@ const COUNTRY_NAMES: Record<string, string> = {
 };
 
 export function countryName(code: string): string {
+  if (!/^[A-Za-z]{2}$/.test(code)) return 'País não informado';
   return COUNTRY_NAMES[code.toUpperCase()] ?? code.toUpperCase();
 }
 

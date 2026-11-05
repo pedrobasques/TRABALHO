@@ -208,7 +208,10 @@ export function scanHistoryToJobs(text: string): Job[] {
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     const cells = line.split('\t').map((c) => c.replace(/^'(?=[=+\-@])/, ''));
-    const get = (k: (typeof SCAN_HISTORY_COLUMNS)[number]) => cells[SCAN_HISTORY_COLUMNS.indexOf(k)] ?? '';
+    // Legacy layout (career-ops ≤ v1.18): url, first_seen, title.
+    const legacy = cells.length === 3;
+    const get = (k: (typeof SCAN_HISTORY_COLUMNS)[number]) =>
+      legacy ? (k === 'url' ? cells[0]! : k === 'first_seen' ? cells[1]! : k === 'title' ? cells[2]! : '') : (cells[SCAN_HISTORY_COLUMNS.indexOf(k)] ?? '');
     if (get('url') === 'url' || !/^https?:\/\//.test(get('url'))) continue;
     const loc = get('location');
     const country = /\b(Brazil|Brasil)\b/i.test(loc) ? 'BR' : /\bItal/i.test(loc) ? 'IT' : /\b(Germany|Deutschland)\b/i.test(loc) ? 'DE' : /\b(Spain|España)\b/i.test(loc) ? 'ES' : /\bNetherlands\b/i.test(loc) ? 'NL' : /\b(United States|USA)\b/i.test(loc) ? 'US' : /\bAustralia\b/i.test(loc) ? 'AU' : '??';
@@ -216,9 +219,9 @@ export function scanHistoryToJobs(text: string): Job[] {
     out.push({
       id: `scan-${get('listing_key') || get('fingerprint') || slug(get('url'))}`,
       origin: 'career-ops',
-      title: get('title'),
-      normalizedTitle: get('title'),
-      company: get('company'),
+      title: get('title') || '(sem título)',
+      normalizedTitle: get('title') || '(sem título)',
+      company: get('company') || 'Empresa não informada',
       sector: '—',
       area: 'other',
       country,

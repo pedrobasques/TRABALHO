@@ -13,7 +13,11 @@ _Última atualização: 2026-11-04 (sessão 1 — Fases 0 e 1)_
 | Suíte core `test-all.mjs` (com arquivos commitados) | **20.229 aprovados, 5 falhas, 31 avisos** — ver abaixo |
 | Scripts reproduzíveis | `scripts/setup.sh`, `verify.sh`, `sync-upstream.sh` (sintaxe validada; `sync-upstream.sh` **ainda não executado** de ponta a ponta) |
 
-### As 5 falhas do `test-all` (atribuídas ao ambiente, não confirmadas individualmente)
+### As 5 falhas do `test-all` — investigadas na sessão 2
+
+**Resultado (2026-11-05):** sem `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`, 20.233 ok / 1 falha. Falhas 2–5 confirmadas como causadas pela variável; a falha 1 confirmada como DNS (`getent hosts example.com` falha no container; o teste chama `archiveUrl` em `https://example.com/job/1`). Nenhum defeito de código. Ver `IMPLEMENTATION_STATUS.md`.
+
+Registro original da sessão 1:
 1. `archive-posting egress guard blocked a legitimate request` — o container não resolve DNS de `example.com` (proxy de rede do Claude Cloud).
 2–5. Quatro testes de diagnóstico de browser (`doctor: no browser binary…`, `…cannot load its libraries…`, `…any other launch failure…`, `the reason carries the install hint`) — os testes simulam "browser ausente", mas a variável `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` que exportamos para usar o Chromium do container sobrepõe a simulação (a saída mostra "using the configured browser at /opt/pw-browsers/…").
 Próximo passo: rodar o `test-all` sem essa variável numa máquina com Chromium instalado e confirmar.

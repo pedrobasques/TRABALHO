@@ -13,3 +13,13 @@ O Claude Code Cloud é **efêmero**: não serve para hospedagem, banco ou agenda
 
 Recomendação preliminar: **VPS barata ou máquina própria sempre ligada + Tailscale** para rodar o career-ops completo
 (é local-first por design), e app Career OS com auth para leitura no celular. Requer autorização de gasto.
+
+## Preparação para deploy (sessão 2 — nada publicado)
+
+- O dashboard é um app Next.js padrão (`career-os/apps/dashboard`), buildável com `npm run build` na raiz `career-os/`.
+- Variáveis: `CAREER_OS_DATA_SOURCE`, `CAREER_OPS_ROOT`, `CAREER_OS_PRIVATE_DIR` (ver `.env.example`).
+- **Bloqueadores antes de qualquer hospedagem:** (1) autenticação (ex.: Auth.js com um único usuário, ou acesso só via Tailscale);
+  (2) fonte de dados persistente — numa hospedagem serverless não existem os arquivos do career-ops, então é preciso
+  implementar `DatasetRepository` sobre Postgres/Supabase (índice derivado, ADR-002) ou rodar numa VPS com o career-ops ao lado;
+  (3) remover a rota de diagnóstico ou protegê-la pela autenticação.
+- Caminho recomendado (menor risco): VPS/mini-PC próprio + Tailscale + `npm start` sob systemd, career-ops no mesmo host com cron.

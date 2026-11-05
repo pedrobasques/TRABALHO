@@ -40,7 +40,7 @@ export function BarList({
         const content = (
           <>
             <div className="relative h-7 flex-1 overflow-hidden rounded-md bg-surface-2">
-              <div className="absolute inset-y-0 left-0 rounded-md transition-[width] duration-300" style={{ width: `${(d.value / max) * 100}%`, background: color, opacity: selected?.length && !active ? 0.35 : 0.85 }} />
+              <div className="absolute inset-y-0 left-0 rounded-md transition-[width] duration-300" style={{ width: `${(d.value / max) * 100}%`, background: color, opacity: selected?.length && !active ? 'calc(var(--bar-alpha) * 0.4)' : 'var(--bar-alpha)' }} />
               <span className="relative z-10 flex h-full items-center truncate px-2.5 text-xs font-medium text-fg">{d.label}</span>
             </div>
             <span className="tabular w-12 shrink-0 text-right text-xs font-medium text-muted">{valueLabel(d.value)}</span>
@@ -75,7 +75,7 @@ export function FunnelChart({ steps }: { steps: { key: string; label: string; co
           <div className="relative h-7 overflow-hidden rounded-md bg-surface-2" title={`${s.label}: ${s.count}`}>
             <div
               className="absolute inset-y-0 left-0 rounded-md transition-[width] duration-300"
-              style={{ width: `${Math.max(s.count ? 2 : 0, (s.count / max) * 100)}%`, background: `color-mix(in srgb, var(--chart-1) ${100 - i * 9}%, var(--chart-2))` }}
+              style={{ width: `${Math.max(s.count ? 2 : 0, (s.count / max) * 100)}%`, background: `color-mix(in srgb, var(--chart-1) ${100 - i * 9}%, var(--chart-2))`, opacity: 'var(--bar-alpha)' }}
             />
             <span className="tabular relative z-10 flex h-full items-center px-2.5 text-xs font-semibold text-fg">{fmtInt(s.count)}</span>
           </div>

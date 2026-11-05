@@ -6,8 +6,11 @@ melhoria contínua, Power Platform/IA, supply chain automotivo; alvo Brasil + Eu
 Construído **sobre** o career-ops (MIT), vendorizado em `upstream/career-ops/`.
 
 ## Estado atual (atualize ao fim de cada sessão)
-- Fases 0 e 1 concluídas em 2026-11-04 (test-all: 20.229 ok / 5 falhas de ambiente) — ver `docs/STATUS.md`.
-- Nenhum código próprio do Career OS ainda (`apps/`, `packages/` vazios). Fase 2 é a próxima.
+- Sessão 1 (2026-11-04): career-ops v1.38.0 vendorizado e instalado (Fases 0–1).
+- Sessão 2 (2026-11-05): `packages/core` (domínio, matching 0–100, métricas, adaptador career-ops) e
+  `apps/dashboard` (9 telas) implementados com dados DEMO. **Fonte da verdade do estado: `docs/IMPLEMENTATION_STATUS.md`.**
+- Desenvolvimento na branch `claude/pensive-goldberg-6cisv7`; `main` = baseline estável (PR aberto).
+- Próximo: Fase 1.5 (onboarding real do usuário) e leitura de `cv.md`/`profile.yml` no core.
 
 ## Regras invioláveis
 1. **Não inventar** fatos profissionais (resultados, números, datas, cargos, certificações, vistos, idiomas).
@@ -25,16 +28,22 @@ Construído **sobre** o career-ops (MIT), vendorizado em `upstream/career-ops/`.
 
 ## Comandos
 ```bash
+cd career-os && npm install          # workspaces: packages/core + apps/dashboard
+npm run check                        # typecheck + testes core + build do dashboard
+npm start                            # dashboard em http://127.0.0.1:3100 (sem login — nunca expor)
+npm run test:e2e                     # requer o servidor acima rodando
+CAREER_OS_DATA_SOURCE=demo|career-ops|auto   # fonte de dados (padrão auto)
 career-os/scripts/setup.sh          # instala core + web, build, doctor
 career-os/scripts/verify.sh         # syntax check + web typecheck/test/build + test-all
 career-os/scripts/sync-upstream.sh <ref>   # atualiza o snapshot do career-ops
 cd career-os/upstream/career-ops/web && npm start   # UI local em 127.0.0.1:3000 (sem login!)
 ```
 No container cloud, use `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome`
-(o caminho pode mudar; `ls /opt/pw-browsers`).
+(o caminho pode mudar; `ls /opt/pw-browsers`). **Não** a exporte ao rodar `test-all.mjs`: ela anula 4 testes de
+diagnóstico de navegador (confirmado na sessão 2). A única falha remanescente do test-all no container é DNS de `example.com`.
 
 ## Mapa de documentação
-`docs/STATUS.md` (o que existe de fato) · `docs/AUDIT.md` · `docs/VISION.md` · `docs/ARCHITECTURE.md` ·
+`docs/IMPLEMENTATION_STATUS.md` (o que existe de fato) · `docs/STATUS.md` (sessão 1) · `docs/AUDIT.md` · `docs/ARCHITECTURE.md` ·
 `docs/DATA_MODEL.md` · `docs/ROADMAP.md` · `docs/BACKLOG.md` · `docs/adr/` · `docs/SETUP.md` ·
 `docs/UPSTREAM_STRATEGY.md` · `docs/SECURITY.md` · `docs/TEST_PLAN.md` · `docs/HOSTING.md` · `docs/INTEGRATIONS.md` ·
 `docs/DESIGN.md`
