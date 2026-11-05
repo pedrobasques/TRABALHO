@@ -47,13 +47,14 @@ async function main(): Promise<RunLog> {
   const errors: string[] = [];
   const stats: Record<string, unknown> = { careerOpsRoot: CO };
 
-  if (!existsSync(join(CO, 'package.json'))) throw new Error(`career-ops not found at ${CO}`);
+  // CO is a career-ops DATA root (may differ from the code dir): it only needs to exist.
+  if (!existsSync(CO)) throw new Error(`career-ops data root not found: ${CO}`);
 
   if (flag('--scan')) {
     if (!existsSync(join(CO, 'portals.yml'))) {
       errors.push('scan skipped: portals.yml not configured (copy templates/portals.example.yml and customize)');
     } else {
-      const r = spawnSync(process.execPath, ['scan.mjs', '--quiet'], { cwd: CO, encoding: 'utf8', timeout: 15 * 60_000 });
+      const r = spawnSync(process.execPath, ['scan.mjs', '--quiet'], { cwd: join(ROOT, 'upstream', 'career-ops'), env: { ...process.env, CAREER_OPS_ROOT: CO }, encoding: 'utf8', timeout: 15 * 60_000 });
       stats.scanExitCode = r.status;
       const tail = (r.stderr || r.stdout || '').trim().split('\n').slice(-5).join(' | ');
       if (r.status !== 0) errors.push(`scan.mjs exited ${r.status}: ${tail.slice(0, 500)}`);

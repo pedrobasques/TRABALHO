@@ -21,7 +21,8 @@
     "test:pg": "npm --workspace @career-os/db run test:pg",
     "radar": "node scripts/radar-ingest.ts",
     "sync": "node scripts/pipeline-sync.ts",
-    "export": "node scripts/pipeline-export.ts"
+    "export": "node scripts/pipeline-export.ts",
+    "pilot": "bash scripts/pilot.sh"
   },
   "type": "module"
 }
