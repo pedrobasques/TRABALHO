@@ -6,11 +6,11 @@ melhoria contínua, Power Platform/IA, supply chain automotivo; alvo Brasil + Eu
 Construído **sobre** o career-ops (MIT), vendorizado em `upstream/career-ops/`.
 
 ## Estado atual (atualize ao fim de cada sessão)
-- Sessão 1 (2026-11-04): career-ops v1.38.0 vendorizado e instalado (Fases 0–1).
-- Sessão 2 (2026-11-05): `packages/core` (domínio, matching 0–100, métricas, adaptador career-ops) e
-  `apps/dashboard` (9 telas) implementados com dados DEMO. **Fonte da verdade do estado: `docs/IMPLEMENTATION_STATUS.md`.**
-- Desenvolvimento na branch `claude/pensive-goldberg-6cisv7`; `main` = baseline estável (PR aberto).
-- Próximo: Fase 1.5 (onboarding real do usuário) e leitura de `cv.md`/`profile.yml` no core.
+- Sessão 1: career-ops v1.38.0 vendorizado. Sessão 2: core + dashboard (9 telas, DEMO). PR #1.
+- Sessão 3 (2026-11-05): auth (fail-closed na Vercel), Supabase schema + RLS, PipelineStore persistente
+  (arquivo/Postgres), ingest do radar, adaptadores cv.md/profile.yml. Branch `claude/sprint3-cloud-foundation`.
+- **Fonte da verdade do estado: `docs/IMPLEMENTATION_STATUS.md`.** Deploy: `docs/DEPLOYMENT.md`. Dados: `docs/adr/ADR-007…`, `docs/PERSISTENCE.md`.
+- Bloqueios externos: conta Vercel/Supabase do usuário; rede do container bloqueia hosts de ATS (coleta real só fora daqui).
 
 ## Regras invioláveis
 1. **Não inventar** fatos profissionais (resultados, números, datas, cargos, certificações, vistos, idiomas).
@@ -30,8 +30,11 @@ Construído **sobre** o career-ops (MIT), vendorizado em `upstream/career-ops/`.
 ```bash
 cd career-os && npm install          # workspaces: packages/core + apps/dashboard
 npm run check                        # typecheck + testes core + build do dashboard
-npm start                            # dashboard em http://127.0.0.1:3100 (sem login — nunca expor)
+npm start                            # http://127.0.0.1:3100 (login desligado localmente; obrigatório na Vercel)
 npm run test:e2e                     # requer o servidor acima rodando
+npm run test:pg                      # Postgres real local (docs/PERSISTENCE.md)
+npm run radar -- [--scan] [--db]     # ingest/normalização do radar
+node apps/dashboard/scripts/hash-password.mjs   # credenciais do login
 CAREER_OS_DATA_SOURCE=demo|career-ops|auto   # fonte de dados (padrão auto)
 career-os/scripts/setup.sh          # instala core + web, build, doctor
 career-os/scripts/verify.sh         # syntax check + web typecheck/test/build + test-all
@@ -46,4 +49,4 @@ diagnóstico de navegador (confirmado na sessão 2). A única falha remanescente
 `docs/IMPLEMENTATION_STATUS.md` (o que existe de fato) · `docs/STATUS.md` (sessão 1) · `docs/AUDIT.md` · `docs/ARCHITECTURE.md` ·
 `docs/DATA_MODEL.md` · `docs/ROADMAP.md` · `docs/BACKLOG.md` · `docs/adr/` · `docs/SETUP.md` ·
 `docs/UPSTREAM_STRATEGY.md` · `docs/SECURITY.md` · `docs/TEST_PLAN.md` · `docs/HOSTING.md` · `docs/INTEGRATIONS.md` ·
-`docs/DESIGN.md`
+`docs/DESIGN.md` · `docs/DEPLOYMENT.md` · `docs/PERSISTENCE.md`

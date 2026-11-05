@@ -1,52 +1,50 @@
 # Career OS — Implementation Status
 
-_Registro objetivo do estado atual. Atualizado: 2026-11-05 (sessão 2). Branch de desenvolvimento: `claude/pensive-goldberg-6cisv7`; baseline estável: `main`._
+_Atualizado: 2026-11-05 (sessão 3 — Cloud Foundation & Real Data). Branch: `claude/sprint3-cloud-foundation` (PR empilhado sobre o PR #1). Baseline: `main`._
 
-Legenda: ✅ implementado e testado · 🟢 implementado (teste manual/visual) · 🟡 parcial · 🧪 simulado (DEMO) · ⬜ planejado · ⛔ bloqueado (depende do usuário/infra)
+Legenda: ✅ implementado e testado · 🟢 implementado (verificação manual/visual) · 🟡 parcial · 🧪 simulado (DEMO) · ⬜ planejado · ⛔ bloqueado (depende do usuário/infra)
 
 ## Módulos
 
 | Módulo | Status | Funcionalidade real | Limitações |
 |---|---|---|---|
-| `packages/core` — domínio | ✅ | Tipos de vaga, requisito, perfil com proveniência, candidatura, automação, dataset | — |
-| Matching 0–100 | ✅ | Determinístico; met/not_met/unknown; pesos configuráveis; gates de autorização e idioma; confiança; teto "moderada" com dados insuficientes; nota 1–5 do career-ops exibida à parte | Pesos definidos manualmente (não validados estatisticamente); sem UI de edição; sem LLM |
-| Métricas / funil / KPIs | ✅ | Coorte por período, funil monotônico, conversões com denominador correto, tempo por etapa, séries semanais, histograma, competências, lacunas | — |
-| Adaptador career-ops (leitura) | ✅ | `data/applications.md`, `status-log.tsv`, `scan-history.tsv` (formato atual e legado ≤v1.18), aliases de status | Somente leitura; não lê `cv.md`/`profile.yml` (perfil fica vazio no modo career-ops); vagas do tracker não têm requisitos ⇒ confiança baixa; sem dedup tracker×scan |
-| Dados DEMO | 🧪 | 40 vagas, 18 candidaturas, perfil fictício — um único dataset consistente, com selo DEMO em toda a UI | Empresas fictícias, sem links |
-| Command Center `/dashboard` | ✅ | KPIs por período (URL `?period=`), funil, Action Center derivado, ranking, distribuição geográfica | — |
-| Job Radar `/jobs` | ✅ | Busca sem acento, 7 filtros multi-seleção + score mínimo + favoritas, 5 ordenações, paginação, tabela/cards, export CSV | Filtros não persistem na URL (exceto `q` e `country`) |
-| Job Intelligence `/jobs/[id]` | ✅ | Requisito a requisito, componentes do score, explicação, estratégia por regras, elegibilidade, vagas semelhantes, favoritar, enviar ao pipeline (local) | "Candidatar no portal" desabilitado por design |
-| Pipeline `/applications` | ✅ | Kanban 9 colunas (drag & drop + select acessível), tabela, busca, país, drawer com histórico, métricas | Movimentações só no navegador (localStorage) — não escrevem no career-ops |
-| Analytics `/analytics` | ✅ | 8 gráficos orientados a perguntas, filtro país/período, export Markdown/CSV | Gráficos próprios (SVG) sem zoom/brush |
-| Career Profile `/profile` | 🟢 | Todas as seções com proveniência, elegibilidade por país, preferências | Sem edição; sem importação do career-ops |
-| CV Studio `/cv-studio` | 🟡 | Status real dos arquivos, templates lidos do career-ops, candidaturas que precisam de CV, pendências de validação, comandos reutilizados | Geração/versionamento/diff de CV: planejado (Fase 4) |
-| Automation Center `/automations` | 🟡 | Catálogo honesto (nada agendado); diagnóstico real via `POST /api/diagnostics` com histórico em `career-os/private/` | Sem scheduler; nenhuma coleta é disparada pela UI |
-| Settings `/settings` | 🟢 | Fonte de dados, regras de matching, integrações, privacidade, custos, reset local | Configuração somente leitura |
-| Tema claro/escuro | 🟢 | Escuro padrão; claro via toggle (persistido) | — |
-| Autenticação | ⬜ | — | Servidor só em 127.0.0.1; **não expor** |
-| Persistência remota / cloud | ⬜ | Contrato `DatasetRepository` definido | Fase 6 |
-| Gmail / Calendar | ⛔ | — | Requer autorização OAuth do usuário |
-| Envio de candidaturas | ⛔ | — | Desabilitado por política |
+| Matching 0–100 | ✅ | Determinístico; met/not_met/unknown; gates de autorização e idioma; confiança; nota 1–5 separada | Pesos manuais |
+| Métricas / funil / KPIs / Action Center | ✅ | Coorte por período, conversões corretas | — |
+| **Auth do dashboard** | ✅ | `proxy.ts` em todas as rotas; senha scrypt + cookie HMAC httpOnly 12 h; rate limit; anti open-redirect; CSRF por Sec-Fetch-Site/Origin; logout; **fail-closed na Vercel (503 sem configuração)** | Usuário único; rate limit em memória por instância |
+| **Deploy Vercel** | 🟡 | `vercel.json` (monorepo), build simulado com `VERCEL=1` OK, nada de upstream/privado no bundle, guia `docs/DEPLOYMENT.md` | ⛔ **Não publicado**: requer sua conta Vercel (sem integração nesta sessão) |
+| **Schema Supabase** | ✅ | 12 tabelas, FKs, checks, dedup, triggers de histórico e auditoria, 39 políticas RLS, migrações versionadas | Testado em PostgreSQL 16 local com shim de auth; ⛔ projeto Supabase real não criado |
+| **PipelineStore** (memória / arquivo / Postgres) | ✅ | Adicionar, mover, histórico, sem duplicatas, eventos, sobrevive a reinício; mesma suíte de contrato nas 3 | Escrita de volta no tracker do career-ops: ⬜ |
+| **API do pipeline** | ✅ | `GET/POST /api/pipeline`, `PATCH /api/pipeline/[jobId]`, `GET …/events`; adoção de candidaturas existentes com histórico | — |
+| Pipeline (UI) | ✅ | Kanban/tabela agora persistentes (arquivo local ou Postgres); badge "salvo"/"navegador"; toasts de erro | Sem banco na Vercel ⇒ fallback explícito "Só navegador" |
+| **Ingest do radar** | ✅ | `npm run radar [--scan] [--db]`: lê scan-history/tracker, normaliza país/senioridade/área/modalidade, dedup por URL e identidade, registra problemas de qualidade, log de execução, espelho idempotente no banco | ⛔ **Coleta piloto não executada**: a política de rede deste ambiente bloqueia os hosts de ATS (403 no proxy) |
+| **Adaptador de perfil real** | ✅ | `cv.md` (layouts atual e antigo, PT/EN), `profile.yml` (authorized_in), `private/profile-extension.yml` (elegibilidade "em processo", prioridades); tudo `declarado`; desconhecidos listados; estimativas marcadas como interpretação | Sem UI de edição; perfil ainda não espelhado no banco |
+| Job Radar / Detalhe | ✅ | + badges "coletada" e "dados incompletos", card de qualidade dos dados | — |
+| Perfil (UI) | ✅ | + relatório de importação (fontes, desconhecidos, interpretações) | — |
+| Automation Center | 🟡 | Catálogo + diagnóstico real + **execuções reais de ingestão** | Sem scheduler |
+| CV Studio | 🟡 | Inalterado desde a sessão 2 | Geração: Fase 4 |
+| Gmail / Calendar / envio de candidaturas | ⛔ | — | Requer autorização |
 
-## Testes (sessão 2)
+## Limitações conhecidas (verificadas)
+- Linhas legadas do scan-history (≤ v1.18) não trazem empresa: a mesma vaga pode aparecer 2× (tracker + scan) porque a dedup por identidade exige empresa. Não fazemos casamento por suposição.
+- Na tabela do radar em 1440px, a coluna Status pode exigir rolagem horizontal interna da tabela (sem overflow da página).
+
+## O que realmente persiste hoje
+- **Localmente / VPS:** pipeline em `career-os/private/pipeline.<origem>.json` (arquivo 0600, escrita atômica) — comprovado após reinício do servidor; logs de ingest e diagnóstico em `career-os/private/*.jsonl`.
+- **Postgres:** comprovado contra PostgreSQL 16 local (dashboard → API → RLS → `application_events`). Supabase real: aguarda criação do projeto.
+- **Vercel sem banco:** nada persiste no servidor; a UI declara "Só navegador".
+
+## Testes (sessão 3)
 
 | Suíte | Comando | Resultado |
 |---|---|---|
-| Core (node:test) | `npm test` (em `career-os/`) | **30/30** |
-| Typecheck core + dashboard | `npm run typecheck` | 0 erros |
-| Build Next.js | `npm run build` | OK, 12 rotas |
-| E2E Playwright (node:test) | `npm run test:e2e` com servidor em :3100 | **13/13** |
-| Modo career-ops | servidor com `CAREER_OS_DATA_SOURCE=career-ops CAREER_OPS_ROOT=upstream/career-ops/test-fixtures/upgrade/state-v1.18` | 7 rotas HTTP 200, sem selo DEMO |
-| Overflow mobile 390px / erros de console | script Playwright | 0 / 0 |
-| career-ops `test-all.mjs` (sem `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`) | `node test-all.mjs` | 20.233 ok, **1 falha** — teste faz DNS real de `example.com`, que o container não resolve (`getent hosts example.com` falha) |
+| Core | `npm test` (workspace core) | **55/55** |
+| Dashboard (auth unit) | `npm test` (workspace dashboard) | **4/4** |
+| DB contra PostgreSQL 16 real | `npm run test:pg` (cluster local :54329) | **16/16** (contrato + RLS + ingest); sem `TEST_DATABASE_URL` ⇒ *skipped*, nunca falso positivo |
+| Typecheck + build | `npm run check` / `VERCEL=1 next build` | OK, 19 rotas + proxy |
+| E2E app (auth off, store arquivo) | `npm run test:e2e` | **13/13** (rodado 2× seguidas: idempotente) |
+| E2E auth (servidor com senha) | `AUTH_BASE_URL=… AUTH_PASSWORD=… npm run test:e2e` | **2/2** (requer servidor recém-iniciado: o rate limit bloqueia após 5 erros) |
+| Smoke HTTP | curl | 503 fail-closed na Vercel; 307→login; 401 API; cookie adulterado 401; open-redirect neutralizado; 403 cross-site; 400 etapa inválida |
+| Varredura visual | Playwright 1440px e 390px, 3 configurações (demo / auth / career-ops+Postgres) | 28 páginas: HTTP 200, 0 erros de console, 0 overflow horizontal |
 
-As 4 falhas de diagnóstico de navegador da sessão 1 foram **confirmadas** como efeito da variável `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` exportada por nós: sem ela, passam.
-
-Lint: não há ESLint configurado (Next 16 removeu `next lint`; adicionar seria nova dependência). TypeScript `strict` + `noUncheckedIndexedAccess` cobre a maior parte.
-
-## O que é simulado
-- Todo o conteúdo do modo DEMO (vagas, empresas, candidaturas, perfil). Selo "Dados DEMO" no topo de todas as telas.
-- Movimentações de pipeline, favoritos e "enviar ao pipeline": reais na UI, mas **locais** (localStorage), marcadas como tal.
-
-## Como executar / testar
-Ver `docs/SETUP.md` (seção Dashboard) e `docs/TEST_PLAN.md`.
+## Como executar
+Ver `docs/SETUP.md`, `docs/DEPLOYMENT.md` e `docs/PERSISTENCE.md`.
