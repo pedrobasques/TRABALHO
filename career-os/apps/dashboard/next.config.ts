@@ -4,6 +4,9 @@ const config: NextConfig = {
   transpilePackages: ['@career-os/core'],
   poweredByHeader: false,
   reactStrictMode: true,
+  async redirects() {
+    return [{ source: '/', destination: '/dashboard', permanent: false }];
+  },
   async headers() {
     return [
       {

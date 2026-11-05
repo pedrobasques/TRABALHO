@@ -126,7 +126,7 @@ export function MetricCard({ label, value, hint, icon, tone = 'neutral', testId 
   return (
     <Card className="p-4" data-testid={testId}>
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-xs font-medium text-muted">{label}</span>
+        <span className="line-clamp-2 text-xs leading-tight font-medium text-muted">{label}</span>
         {icon && <span className={cn('grid size-7 shrink-0 place-items-center rounded-lg', iconTone[tone])}>{icon}</span>}
       </div>
       <div className="tabular mt-2 text-2xl font-semibold tracking-tight text-fg" data-testid={testId ? `${testId}-value` : undefined}>

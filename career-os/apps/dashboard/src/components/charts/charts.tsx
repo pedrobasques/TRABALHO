@@ -104,7 +104,7 @@ export function LineChart({
   if (!labels.length || total === 0) return <NoData />;
   const W = 600;
   const H = height;
-  const P = { l: 28, r: 8, t: 10, b: 22 };
+  const P = { l: 28, r: 26, t: 10, b: 22 };
   const max = Math.max(1, ...series.flatMap((s) => s.values));
   const niceMax = Math.ceil(max / 2) * 2;
   const x = (i: number) => P.l + (labels.length === 1 ? (W - P.l - P.r) / 2 : (i * (W - P.l - P.r)) / (labels.length - 1));

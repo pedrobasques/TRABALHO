@@ -118,7 +118,7 @@ export function Analytics() {
         <ChartCard title="Oportunidades por área" question="As vagas encontradas estão alinhadas às áreas prioritárias?">
           <BarList color="var(--chart-3)" data={byArea.map((x) => ({ key: x.key, label: AREA_LABEL[x.key as JobArea], value: x.count }))} />
         </ChartCard>
-        <ChartCard title="Distribuição de match scores" question="Quantas vagas têm aderência suficiente para agir (≥ 65)?">
+        <ChartCard title="Distribuição de match scores" question="Quantas vagas têm aderência suficiente para agir (≥ 60)?">
           <ColumnChart data={hist.map((b) => ({ label: `${b.from}`, value: b.count }))} highlight={(i) => hist[i]!.from >= 60} color="var(--chart-2)" />
           <p className="mt-2 text-[11px] text-subtle">Faixas de 10 pontos. Barras destacadas: ≥ 60. Score mede aderência, não elegibilidade.</p>
         </ChartCard>
