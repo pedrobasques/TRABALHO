@@ -7,7 +7,7 @@ import { useStore } from '@/lib/store';
 import { cn } from '@/lib/format';
 import { Button, Card, CardHeader, EmptyState, InfoNote, PageHeader, Spinner, StatusBadge, type Tone } from '@/components/ui/primitives';
 import { useToast } from '@/components/ui/toast';
-import type { DiagnosticRun } from '@/lib/data.server';
+import type { DiagnosticRun, IngestRun } from '@/lib/data.server';
 
 const STATE: Record<AutomationJob['state'], { label: string; tone: Tone }> = {
   manual: { label: 'Manual', tone: 'accent' },
@@ -19,7 +19,7 @@ const LEVEL = ['', 'Coleta', 'Triagem', 'Matching', 'Deep analysis', 'Preparaç�
 const ICON = { ok: CheckCircle2, warn: CircleAlert, fail: CircleX } as const;
 const COLOR = { ok: 'text-success', warn: 'text-warning', fail: 'text-danger' } as const;
 
-export function AutomationCenter({ initialRuns }: { initialRuns: DiagnosticRun[] }) {
+export function AutomationCenter({ initialRuns, ingestRuns }: { initialRuns: DiagnosticRun[]; ingestRuns: IngestRun[] }) {
   const { dataset } = useStore();
   const toast = useToast();
   const [runs, setRuns] = useState(initialRuns);
@@ -86,7 +86,10 @@ export function AutomationCenter({ initialRuns }: { initialRuns: DiagnosticRun[]
                 <div className="shrink-0 text-xs text-subtle sm:text-right">
                   Próxima execução: <span className="text-muted">{a.schedule ?? '—'}</span>
                   <br />
-                  Última execução: <span className="text-muted">{dataset.runs.find((r) => r.jobId === a.id)?.finishedAt ?? 'nunca'}</span>
+                  Última execução:{' '}
+                  <span className="text-muted">
+                    {a.id === 'ingest' && ingestRuns[0] ? new Date(ingestRuns[0].finishedAt).toLocaleString('pt-BR') : (dataset.runs.find((r) => r.jobId === a.id)?.finishedAt ?? 'nunca')}
+                  </span>
                 </div>
               </li>
             ))}
@@ -121,6 +124,24 @@ export function AutomationCenter({ initialRuns }: { initialRuns: DiagnosticRun[]
                 </ul>
               )}
             </div>
+          </Card>
+          <Card data-testid="ingest-runs">
+            <CardHeader title="Execuções de ingestão do radar" subtitle="Registradas por scripts/radar-ingest.ts em career-os/private/automation-runs.jsonl" />
+            <ul className="space-y-2.5 px-5 pb-5 text-xs">
+              {ingestRuns.length === 0 && <li className="text-muted">Nenhuma ingestão executada. Rode <code className="font-mono">npm run radar</code>.</li>}
+              {ingestRuns.map((r) => (
+                <li key={r.id}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="tabular text-muted">{new Date(r.finishedAt).toLocaleString('pt-BR')}</span>
+                    <StatusBadge tone={r.status === 'ok' ? 'success' : r.status === 'partial' ? 'warning' : 'danger'}>{r.status}</StatusBadge>
+                  </div>
+                  <div className="mt-0.5 text-fg">{r.summary}</div>
+                  {r.errors.slice(0, 3).map((e) => (
+                    <div key={e} className="mt-0.5 text-warning">! {e}</div>
+                  ))}
+                </li>
+              ))}
+            </ul>
           </Card>
           <Card>
             <CardHeader title="Histórico de execuções" subtitle="Diagnósticos gravados em career-os/private/ (fora do Git)" />

@@ -54,6 +54,33 @@ export function ProfileView() {
         </div>
       )}
 
+      {p.importReport && (
+        <Card className="mb-4 p-5" data-testid="import-report">
+          <h2 className="mb-2 text-sm font-semibold">Importação do career-ops</h2>
+          <p className="text-xs text-muted">Fontes lidas: {p.importReport.sources.length ? p.importReport.sources.join(', ') : 'nenhuma'}. Tudo que vem do CV/profile.yml é tratado como <strong>declarado</strong>.</p>
+          {p.importReport.unknowns.length > 0 && (
+            <>
+              <h3 className="mt-3 mb-1 text-xs font-semibold tracking-wide text-warning uppercase">Desconhecido / pendente</h3>
+              <ul className="space-y-1 text-sm">
+                {p.importReport.unknowns.map((u) => (
+                  <li key={u} className="flex gap-2"><span className="mt-2 size-1 shrink-0 rounded-full bg-warning" />{u}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          {p.importReport.notes.length > 0 && (
+            <>
+              <h3 className="mt-3 mb-1 text-xs font-semibold tracking-wide text-muted uppercase">Observações e interpretações</h3>
+              <ul className="space-y-1 text-sm text-muted">
+                {p.importReport.notes.map((n) => (
+                  <li key={n} className="flex gap-2"><span className="mt-2 size-1 shrink-0 rounded-full bg-subtle" />{n}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="p-5 xl:col-span-2">
           <div className="flex items-start gap-4">
@@ -106,11 +133,15 @@ export function ProfileView() {
                     <span className="truncate text-sm text-fg">{s.label}</span>
                     <ProvenanceBadge p={s.provenance} />
                   </div>
-                  <div className="mt-1 flex gap-0.5" aria-label={`nível ${s.level} de 5`}>
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= s.level ? 'bg-accent' : 'bg-surface-2'}`} />
-                    ))}
-                  </div>
+                  {s.level == null ? (
+                    <div className="mt-1 text-[11px] text-subtle">nível não informado na fonte</div>
+                  ) : (
+                    <div className="mt-1 flex gap-0.5" aria-label={`nível ${s.level} de 5`}>
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <span key={i} className={`h-1.5 flex-1 rounded-full ${i <= (s.level ?? 0) ? 'bg-accent' : 'bg-surface-2'}`} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

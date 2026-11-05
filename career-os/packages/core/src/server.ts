@@ -15,6 +15,8 @@ import type { CandidateProfile, Dataset } from './domain/types.ts';
 import { buildDemoDataset } from './data/demo/index.ts';
 import { DEMO_PROFILE } from './data/demo/profile.ts';
 import { parseApplicationsMd, parseStatusLog, scanHistoryToJobs, trackerToDomain } from './data/career-ops/parse.ts';
+import { buildProfileFromCareerOps } from './data/career-ops/profile.ts';
+import { dedupeJobs, normalizeJob } from './ingest/normalize.ts';
 import { AUTOMATION_CATALOG } from './automation/catalog.ts';
 
 export type SourceSetting = 'demo' | 'career-ops' | 'auto';
@@ -59,14 +61,30 @@ export function loadCareerOpsDataset(root = careerOpsRoot()): Dataset {
   notes.push(...tracker.warnings);
   const scanned = scan ? scanHistoryToJobs(scan) : [];
   if (!scan) notes.push('data/scan-history.tsv ausente (nenhuma coleta executada).');
-  const jobs = [...tracker.jobs, ...scanned];
+  // Level 1–2: normalize + dedupe everything that came from real files.
+  const deduped = dedupeJobs([...tracker.jobs, ...scanned].map(normalizeJob));
+  if (deduped.duplicates.length) notes.push(`${deduped.duplicates.length} vaga(s) duplicada(s) mesclada(s) na normalização.`);
+  const keep = new Map(deduped.jobs.map((n) => [n.job.id, { ...n.job, qualityIssues: n.issues }]));
+  for (const d of deduped.duplicates) {
+    for (const a of tracker.applications) if (a.jobId === d.dropped) a.jobId = d.kept;
+  }
+  const jobs = [...keep.values()];
+
+  const extPath = join(process.env.CAREER_OS_PRIVATE_DIR ?? join(process.cwd(), '..', '..', 'private'), 'profile-extension.yml');
+  let imported: ReturnType<typeof buildProfileFromCareerOps>;
+  try {
+    imported = buildProfileFromCareerOps(read('cv.md'), read('config/profile.yml'), existsSync(extPath) ? readFileSync(extPath, 'utf8') : null);
+  } catch (e) {
+    imported = { ...buildProfileFromCareerOps(null, null), notes: [`Falha ao ler o perfil: ${(e as Error).message.split('\n')[0]}`] };
+  }
+  const profile = { ...imported.profile, importReport: { unknowns: imported.unknowns, notes: imported.notes, sources: imported.sources } };
   const dates = jobs.map((j) => j.discoveredAt).filter((d) => d > '1970-01-01').sort();
   return {
     origin: 'career-ops',
     asOf: new Date().toISOString().slice(0, 10),
     jobs,
     applications: tracker.applications,
-    profile: EMPTY_PROFILE,
+    profile: profile.importReport.sources.length ? profile : { ...EMPTY_PROFILE, importReport: profile.importReport },
     automations: AUTOMATION_CATALOG,
     runs: [],
     sourceNotes: [...notes, dates.length ? `Período dos dados: ${dates[0]} → ${dates[dates.length - 1]}` : 'Nenhuma vaga encontrada.'],
@@ -84,3 +102,4 @@ export function loadDataset(): Dataset {
 }
 
 export { FilePipelineStore } from './persistence/file-store.ts';
+export { parseCvMarkdown, buildProfileFromCareerOps, skillKeyFor, type ProfileImport, type ProfileExtension, type ParsedCv } from './data/career-ops/profile.ts';

@@ -9,12 +9,8 @@ export function GET() {
 
 /** Runs the fixed local health checks and appends the result to private/diagnostics.jsonl. */
 export function POST(req: Request) {
-  // same-origin guard: reject cross-site form posts
-  const origin = req.headers.get('origin');
-  const host = req.headers.get('host');
-  if (origin && host && new URL(origin).host !== host) {
-    return NextResponse.json({ error: 'cross-origin request rejected' }, { status: 403 });
-  }
+  // CSRF: enforced centrally in src/proxy.ts for every mutating request.
+  void req;
   const run = runDiagnostics();
   const saved = saveDiagnosticRun(run);
   return NextResponse.json({ run, saved });

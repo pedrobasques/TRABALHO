@@ -19,7 +19,15 @@ export async function proxy(req: NextRequest) {
     const site = req.headers.get('sec-fetch-site');
     const origin = req.headers.get('origin');
     const host = req.headers.get('host');
-    const crossSite = (site && site !== 'same-origin' && site !== 'none') || (origin && host && new URL(origin).host !== host);
+    // Sec-Fetch-Site is authoritative when present (all modern browsers). Origin may be the literal "null".
+    const originHost = (() => {
+      try {
+        return origin && origin !== 'null' ? new URL(origin).host : null;
+      } catch {
+        return 'invalid';
+      }
+    })();
+    const crossSite = site ? site !== 'same-origin' && site !== 'none' : Boolean(originHost && host && originHost !== host);
     if (crossSite) return NextResponse.json({ error: 'cross-origin request rejected' }, { status: 403 });
   }
 

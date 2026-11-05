@@ -123,6 +123,8 @@ export interface Job {
   careerOpsScore: number | null;
   /** Visa sponsorship explicitly offered / refused / not stated. */
   visaSponsorship: 'offered' | 'not_offered' | 'unknown';
+  /** Data-quality gaps found during normalization (real sources only). */
+  qualityIssues?: string[];
 }
 
 /* ---------------------------------------------------------------- profile */
@@ -133,8 +135,8 @@ export type Provenance = 'proven' | 'declared' | 'interpretation' | 'pending_val
 export interface ProfileSkill {
   key: string;
   label: string;
-  /** 1 (basic) … 5 (expert). */
-  level: number;
+  /** 1 (basic) … 5 (expert); null when the source does not state it (never defaulted). */
+  level: number | null;
   provenance: Provenance;
   aliases?: string[];
 }
@@ -202,6 +204,8 @@ export interface CandidateProfile {
     minAnnualSalaryEur: number | null;
   };
   goals: string[];
+  /** Present when the profile was imported from real files: what is missing, estimates, and which files were read. */
+  importReport?: { unknowns: string[]; notes: string[]; sources: string[] };
 }
 
 /* ------------------------------------------------------------ applications */

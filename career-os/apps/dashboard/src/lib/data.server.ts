@@ -87,6 +87,31 @@ export function runDiagnostics(): DiagnosticRun {
 
 const LOG = () => join(privateDir(), 'diagnostics.jsonl');
 
+export interface IngestRun {
+  id: string;
+  kind: string;
+  status: 'ok' | 'partial' | 'failed';
+  startedAt: string;
+  finishedAt: string;
+  summary: string;
+  stats: Record<string, unknown>;
+  errors: string[];
+}
+
+/** Real ingest runs written by scripts/radar-ingest.ts (local file; never fabricated). */
+export function readIngestRuns(limit = 10): IngestRun[] {
+  try {
+    return readFileSync(join(privateDir(), 'automation-runs.jsonl'), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as IngestRun)
+      .slice(-limit)
+      .reverse();
+  } catch {
+    return [];
+  }
+}
+
 export function saveDiagnosticRun(run: DiagnosticRun): boolean {
   try {
     mkdirSync(privateDir(), { recursive: true });

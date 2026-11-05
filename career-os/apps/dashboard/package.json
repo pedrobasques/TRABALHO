@@ -28,5 +28,8 @@
     "postcss": "^8.5.18",
     "tailwindcss": "^4.2.2",
     "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=22.18.0"
   }
 }

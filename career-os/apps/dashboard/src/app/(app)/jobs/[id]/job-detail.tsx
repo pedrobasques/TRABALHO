@@ -141,6 +141,7 @@ export function JobDetail({ id }: { id: string }) {
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             {job.origin === 'demo' && <DemoIndicator />}
+            {job.origin === 'career-ops' && <StatusBadge tone="accent">Coletada · career-ops</StatusBadge>}
             <JobStatusBadge s={job.status} />
             <CategoryBadge c={m.category} />
             {app && <StageBadge s={app.stage} />}
@@ -303,6 +304,18 @@ export function JobDetail({ id }: { id: string }) {
             )}
             <p className="mt-3 text-[11px] text-subtle">O score mede aderência; elegibilidade é um gate separado. Nunca assumimos autorização de trabalho sem documento.</p>
           </Card>
+
+          {job.qualityIssues && job.qualityIssues.length > 0 && (
+            <Card className="p-5" data-testid="quality-issues">
+              <h2 className="mb-2 text-sm font-semibold">Qualidade dos dados</h2>
+              <ul className="space-y-1 text-xs text-warning">
+                {job.qualityIssues.map((i) => (
+                  <li key={i}>• {i}</li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11px] text-subtle">Campos ausentes reduzem a confiança do matching; nada é preenchido por suposição.</p>
+            </Card>
+          )}
 
           <Card className="p-5">
             <h2 className="mb-3 text-sm font-semibold">Informações da vaga</h2>

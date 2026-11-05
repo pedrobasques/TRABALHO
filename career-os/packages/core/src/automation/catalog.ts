@@ -20,6 +20,18 @@ export const AUTOMATION_CATALOG: AutomationJob[] = [
     description: 'career-ops: consulta APIs públicas de Greenhouse, Lever, Ashby, Workday, Gupy e outros 120+ providers. Zero tokens.',
   },
   {
+    id: 'ingest',
+    name: 'Ingestão do radar (normalização + dedup)',
+    kind: 'sync',
+    level: 2,
+    schedule: null,
+    enabled: true,
+    state: 'manual',
+    blockedBy: null,
+    command: 'npm run radar -- [--scan] [--db]',
+    description: 'Career OS: lê scan-history/tracker do career-ops, normaliza país/senioridade/área, deduplica, registra qualidade e espelha no Supabase com --db.',
+  },
+  {
     id: 'liveness',
     name: 'Verificação de vagas ativas',
     kind: 'liveness',
