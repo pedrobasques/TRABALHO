@@ -19,7 +19,9 @@
     "test:e2e": "npm --workspace @career-os/dashboard run test:e2e",
     "check": "npm run typecheck && npm test && npm run build",
     "test:pg": "npm --workspace @career-os/db run test:pg",
-    "radar": "node scripts/radar-ingest.ts"
+    "radar": "node scripts/radar-ingest.ts",
+    "sync": "node scripts/pipeline-sync.ts",
+    "export": "node scripts/pipeline-export.ts"
   },
   "type": "module"
 }

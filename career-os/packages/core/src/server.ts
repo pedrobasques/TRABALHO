@@ -103,3 +103,4 @@ export function loadDataset(): Dataset {
 
 export { FilePipelineStore } from './persistence/file-store.ts';
 export { parseCvMarkdown, buildProfileFromCareerOps, skillKeyFor, type ProfileImport, type ProfileExtension, type ParsedCv } from './data/career-ops/profile.ts';
+export { pushPending, pullFromTracker, careerOpsWritable, stageToCareerOpsState, trackerRowOf, type SyncConfig, type SyncReport } from './sync/career-ops-sync.ts';

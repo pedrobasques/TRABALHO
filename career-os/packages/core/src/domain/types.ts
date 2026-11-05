@@ -237,6 +237,10 @@ export interface StageEvent {
   stage: PipelineStage;
   at: IsoDate;
   note?: string;
+  /** Write-back state towards the career-ops tracker (ADR-008); absent for source records. */
+  sync?: 'pending' | 'applied' | 'not_applicable' | 'failed' | 'external';
+  syncDetail?: string | null;
+  actor?: string;
 }
 
 export interface Application {

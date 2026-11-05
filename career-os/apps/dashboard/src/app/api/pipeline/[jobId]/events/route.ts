@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await ctx.params;
-  const ds = getDataset();
+  const ds = await getDataset();
   const { store, status } = await getPipelineStore(ds.origin);
   if (!store) return NextResponse.json({ status, error: status.detail, code: 'unavailable' }, { status: 503 });
   try {

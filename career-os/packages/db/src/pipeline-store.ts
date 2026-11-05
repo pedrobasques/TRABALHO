@@ -6,6 +6,8 @@ import {
   type AddOptions,
   type Job,
   type PipelineEvent,
+  type PendingEvent,
+  type SyncState,
   type PipelineStage,
   type PipelineStore,
   type StoredApplication,
@@ -64,14 +66,19 @@ export class PostgresPipelineStore implements PipelineStore {
   private async eventsFor(tx: Tx, appIds: string[]): Promise<Map<string, PipelineEvent[]>> {
     const m = new Map<string, PipelineEvent[]>();
     if (!appIds.length) return m;
-    const r = await tx.query<{ id: string; application_id: string; from_stage: PipelineStage | null; to_stage: PipelineStage; note: string | null; actor: string; occurred_at: Date }>(
-      `select id::text, application_id, from_stage, to_stage, note, actor, occurred_at
-         from public.application_events where application_id = any($1::uuid[]) order by occurred_at, id`,
+    const r = await tx.query<{ id: string; application_id: string; from_stage: PipelineStage | null; to_stage: PipelineStage; note: string | null; actor: string; occurred_at: Date; sync_state: SyncState | null; sync_detail: string | null; sync_at: Date | null }>(
+      `select e.id::text, e.application_id, e.from_stage, e.to_stage, e.note, e.actor, e.occurred_at,
+              s.state as sync_state, s.detail as sync_detail, s.updated_at as sync_at
+         from public.application_events e left join public.event_sync s on s.event_id = e.id
+        where e.application_id = any($1::uuid[]) order by e.occurred_at, e.id`,
       [appIds],
     );
     for (const e of r.rows) {
       const list = m.get(e.application_id) ?? [];
-      list.push({ id: e.id, from: e.from_stage, to: e.to_stage, at: iso(e.occurred_at), note: e.note, actor: e.actor });
+      list.push({
+        id: e.id, from: e.from_stage, to: e.to_stage, at: iso(e.occurred_at), note: e.note, actor: e.actor,
+        sync: { state: e.sync_state ?? 'pending', at: e.sync_at ? iso(e.sync_at) : null, detail: e.sync_detail },
+      });
       m.set(e.application_id, list);
     }
     return m;
@@ -177,6 +184,29 @@ export class PostgresPipelineStore implements PipelineStore {
         const ev = await this.eventsFor(tx, [row.id]);
         return this.toStored(fresh, ev.get(row.id) ?? []);
       });
+    } catch (e) {
+      wrap(e);
+    }
+  }
+
+  async pendingSync(): Promise<PendingEvent[]> {
+    const apps = await this.list();
+    const out: PendingEvent[] = [];
+    for (const application of apps)
+      for (const event of application.events) if (event.sync?.state === 'pending' || event.sync?.state === 'failed') out.push({ application, event });
+    return out.sort((a, b) => a.event.at.localeCompare(b.event.at));
+  }
+
+  async markSync(eventId: string, state: Exclude<SyncState, 'pending'>, detail: string | null = null): Promise<void> {
+    if (!/^\d+$/.test(eventId)) throw new PipelineError('invalid_input', 'event id must be numeric');
+    try {
+      await withUser(this.db, this.ownerId, (tx) =>
+        tx.query(
+          `insert into public.event_sync (event_id, owner_id, state, detail) values ($1, auth.uid(), $2, $3)
+           on conflict (event_id) do update set state = excluded.state, detail = excluded.detail, updated_at = now()`,
+          [eventId, state, detail],
+        ),
+      );
     } catch (e) {
       wrap(e);
     }

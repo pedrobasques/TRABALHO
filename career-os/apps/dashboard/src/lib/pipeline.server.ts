@@ -73,3 +73,36 @@ export function errorBody(e: unknown) {
 export function seedFrom(base: Application | undefined) {
   return base?.history.map((h) => ({ stage: h.stage, at: h.at, ...(h.note ? { note: h.note } : {}) }));
 }
+
+export interface WriteBack {
+  /** true when the career-ops tracker is on this host and write-back was attempted */
+  attempted: boolean;
+  applied: number;
+  notApplicable: number;
+  failed: number;
+  detail: string;
+}
+
+/**
+ * Applies the job's pending journal events to the canonical career-ops tracker (ADR-008).
+ * Only where the files live (local/VPS, source=career-ops). Elsewhere events stay pending
+ * for `npm run sync` on the host that has the files.
+ */
+export async function writeBack(store: import('@career-os/core').PipelineStore, jobId: string): Promise<WriteBack> {
+  const { activeSource, careerOpsSyncConfig } = await import('@/lib/data.server');
+  const src = activeSource();
+  if (src === 'demo') return { attempted: false, applied: 0, notApplicable: 0, failed: 0, detail: 'Dados DEMO: não há tracker do career-ops para atualizar.' };
+  if (src !== 'career-ops') {
+    return { attempted: false, applied: 0, notApplicable: 0, failed: 0, detail: 'Tracker do career-ops não está neste servidor: evento pendente de sincronização (npm run sync).' };
+  }
+  const { pushPending } = await import('@career-os/core/server');
+  const rep = await pushPending(store, careerOpsSyncConfig(), jobId);
+  if (!rep.available) return { attempted: false, applied: 0, notApplicable: 0, failed: 0, detail: `Escrita no tracker indisponível: ${rep.reason}` };
+  const p = rep.pushed;
+  const detail = p.failed
+    ? `Falha ao gravar no tracker: ${rep.details.find((d) => d.startsWith('FALHA')) ?? 'erro'}`
+    : p.applied + p.unchanged
+      ? 'Gravado no tracker do career-ops (applications.md + status-log.tsv).'
+      : 'Etapa sem equivalente no career-ops ou vaga sem linha no tracker: registrada só no diário.';
+  return { attempted: true, applied: p.applied + p.unchanged, notApplicable: p.notApplicable, failed: p.failed, detail };
+}

@@ -6,7 +6,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Job, PipelineStage } from '../domain/types.ts';
-import { PipelineError, PipelineState, type AddOptions, type PipelineStore, type StoredApplication } from './pipeline.ts';
+import { PipelineError, PipelineState, type AddOptions, type PipelineStore, type StoredApplication, type SyncState } from './pipeline.ts';
 
 interface FileShape {
   version: 1;
@@ -80,5 +80,17 @@ export class FilePipelineStore implements PipelineStore {
 
   events(jobId: string) {
     return this.run(() => this.load().events(jobId));
+  }
+
+  pendingSync() {
+    return this.run(() => this.load().pendingSync());
+  }
+
+  markSync(eventId: string, state: Exclude<SyncState, 'pending'>, detail?: string | null) {
+    return this.run(() => {
+      const st = this.load();
+      st.markSync(eventId, state, detail ?? null);
+      this.save(st);
+    });
   }
 }

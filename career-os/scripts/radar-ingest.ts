@@ -93,10 +93,24 @@ async function main(): Promise<RunLog> {
     if (!DATABASE_URL || !CAREER_OS_OWNER_ID) {
       errors.push('--db requested but DATABASE_URL / CAREER_OS_OWNER_ID are not set; database mirror skipped');
     } else {
-      const { createDb, upsertIngestedJobs } = await import('@career-os/db');
+      const { createDb, upsertIngestedJobs, upsertProfileSnapshot } = await import('@career-os/db');
       const db = createDb({ connectionString: DATABASE_URL });
       try {
-        stats.db = await upsertIngestedJobs(db, CAREER_OS_OWNER_ID, jobs);
+        const up = await upsertIngestedJobs(db, CAREER_OS_OWNER_ID, jobs);
+        stats.db = { inserted: up.inserted, updated: up.updated, failed: up.failed.length };
+        for (const f of up.failed) errors.push(`linha rejeitada pelo banco (${f.jobId}): ${f.error}`);
+        // profile snapshot for deployments without career-ops files (Vercel)
+        const cv = read('cv.md');
+        const yml = read('config/profile.yml');
+        if (cv || yml) {
+          const { buildProfileFromCareerOps } = await import('@career-os/core/server');
+          const extPath = join(OUT, 'profile-extension.yml');
+          const imp = buildProfileFromCareerOps(cv, yml, existsSync(extPath) ? readFileSync(extPath, 'utf8') : null);
+          const snap = await upsertProfileSnapshot(db, CAREER_OS_OWNER_ID, { ...imp.profile, importReport: { unknowns: imp.unknowns, notes: imp.notes, sources: imp.sources } });
+          stats.profileSnapshot = snap.hash;
+        } else {
+          stats.profileSnapshot = 'skipped (sem cv.md/profile.yml)';
+        }
       } catch (e) {
         errors.push(`database mirror failed: ${(e as Error).message}`);
       } finally {
