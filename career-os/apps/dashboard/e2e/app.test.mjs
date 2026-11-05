@@ -148,20 +148,32 @@ describe('Career OS dashboard', () => {
     await m.close();
   });
 
-  test('11. send to pipeline is local-only, confirmed, and reversible', async () => {
-    await go('/jobs/d02'); // not in the demo pipeline
-    await page.getByRole('button', { name: 'Enviar ao pipeline' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Adicionar' }).click();
-    await page.getByText('Adicionada ao pipeline (local)').waitFor();
-    await go('/applications');
-    await page.getByRole('button', { name: /Industrial Project Engineer/ }).waitFor();
-    await go('/settings');
-    await page.getByRole('button', { name: 'Descartar alterações locais' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Descartar' }).click();
-    await go('/applications');
-    await page.getByTestId('kanban').waitFor();
-    await page.waitForTimeout(300); // let the local overlay hydrate
-    assert.equal(await page.getByRole('button', { name: /Industrial Project Engineer/ }).count(), 0);
+  test('11. send to pipeline and move a card persist on the server with history', async () => {
+    const st = await (await page.request.get(BASE + '/api/pipeline')).json();
+    assert.ok(['file', 'postgres'].includes(st.status.kind), `expected server persistence, got ${st.status.kind}`);
+    await go('/jobs/d08'); // not in the demo source pipeline
+    await page.getByTestId('persistence-badge').waitFor(); // persistence status loaded
+    const already = await page.getByRole('link', { name: /No pipeline/ }).count();
+    if (!already) {
+      await page.getByRole('button', { name: 'Enviar ao pipeline' }).click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Adicionar' }).click();
+      await page.getByText(/Adicionada ao pipeline \(salvo no servidor\)|já está no pipeline/).waitFor();
+    }
+    // persisted server-side: visible through the API in a fresh request context
+    const fresh = await browser.newContext();
+    const list = await (await fresh.request.get(BASE + '/api/pipeline')).json();
+    await fresh.close();
+    const app = list.applications.find((a) => a.job.jobId === 'd08');
+    assert.ok(app, 'd08 must be stored server-side');
+    // move via the drawer select and check the event log
+    await go(`/applications?open=${encodeURIComponent(app.id)}`);
+    await page.getByTestId('app-drawer').waitFor();
+    const target = app.stage === 'qualified' ? 'preparing' : 'qualified';
+    await page.getByTestId('stage-select').selectOption(target);
+    await page.getByText(/salvo com histórico/).waitFor();
+    const ev = await (await page.request.get(BASE + '/api/pipeline/d08/events')).json();
+    assert.equal(ev.events.at(-1).to, target);
+    assert.ok(ev.events.length >= 2);
   });
 
   test('12. diagnostics run returns real checks', async () => {

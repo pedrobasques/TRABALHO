@@ -92,8 +92,12 @@ export function JobRadar() {
             <span className="truncate font-medium text-fg">{r.job.title}</span>
             {isFavorite(r.job.id) && <Star className="size-3 shrink-0 fill-warning text-warning" aria-label="Favorita" />}
           </div>
-          <div className="truncate text-xs text-muted">
-            {r.job.company} · {AREA_LABEL[r.job.area]}
+          <div className="flex items-center gap-1.5 truncate text-xs text-muted">
+            <span className="truncate">
+              {r.job.company} · {AREA_LABEL[r.job.area]}
+            </span>
+            {r.job.origin === 'career-ops' && <StatusBadge tone="accent" title="Coletada de fonte real via career-ops">coletada</StatusBadge>}
+            {(r.job.qualityIssues?.length ?? 0) > 2 && <StatusBadge tone="warning" title={r.job.qualityIssues!.join(' · ')}>dados incompletos</StatusBadge>}
           </div>
         </div>
       ),

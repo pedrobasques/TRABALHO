@@ -133,7 +133,7 @@ export function evaluateRequirement(req: Requirement, job: Job, profile: Candida
       const s = findSkill(profile, req.key);
       if (!s) return r('not_met', 'Não consta no perfil.');
       if (s.provenance === 'pending_validation') return r('unknown', `"${s.label}" consta no perfil, mas está pendente de validação.`);
-      return r('met', `"${s.label}" (${PROV[s.provenance]}, nível ${s.level}/5).`);
+      return r('met', `"${s.label}" (${PROV[s.provenance]}${s.level != null ? `, nível ${s.level}/5` : ''}).`);
     }
     case 'certification': {
       if (!req.key) return r('unknown', 'Certificação não mapeada.');

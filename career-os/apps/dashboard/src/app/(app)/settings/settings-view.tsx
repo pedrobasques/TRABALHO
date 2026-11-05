@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Database, KeyRound, Plug, RotateCcw, Scale, ShieldCheck, Wallet } from 'lucide-react';
+import { Database, HardDrive, KeyRound, Plug, RotateCcw, Scale, ShieldCheck, Wallet } from 'lucide-react';
 import { COMPONENT_LABEL, DEFAULT_MATCHING_CONFIG, MIN_COVERAGE, UNKNOWN_CREDIT, type ComponentKey } from '@career-os/core';
 import { useStore } from '@/lib/store';
 import { Button, Card, CardHeader, ConfirmationDialog, InfoNote, PageHeader, StatusBadge, type Tone } from '@/components/ui/primitives';
@@ -17,7 +17,7 @@ const INTEGRATIONS: { name: string; status: string; tone: Tone; note: string }[]
 ];
 
 export function SettingsView({ status }: { status: { active: string; setting: string; root: string; files: Record<string, boolean> } }) {
-  const { dataset, localChanges, resetLocal, overlay } = useStore();
+  const { dataset, localChanges, resetLocal, overlay, persistence } = useStore();
   const toast = useToast();
   const [confirm, setConfirm] = useState(false);
   const w = DEFAULT_MATCHING_CONFIG.weights;
@@ -61,8 +61,26 @@ export function SettingsView({ status }: { status: { active: string; setting: st
           </div>
         </Card>
 
+        <Card id="persistence" data-testid="persistence-card">
+          <CardHeader title="Persistência do pipeline" icon={<HardDrive className="size-4" />} subtitle="Onde ficam as candidaturas e o histórico de etapas" />
+          <div className="space-y-3 px-5 pb-5 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted">Armazenamento</span>
+              <StatusBadge tone={persistence.persistent ? 'success' : persistence.kind === 'loading' ? 'neutral' : 'warning'}>
+                {persistence.kind === 'postgres' ? 'Supabase / Postgres' : persistence.kind === 'file' ? 'Arquivo local' : persistence.kind === 'loading' ? 'Verificando…' : persistence.kind === 'error' ? 'Erro' : 'Nenhum (só navegador)'}
+              </StatusBadge>
+            </div>
+            <p className="text-xs text-muted">{persistence.detail}</p>
+            <ul className="space-y-1 text-xs text-subtle">
+              <li>• CAREER_OS_STORE=auto|file|postgres|none</li>
+              <li>• Postgres: DATABASE_URL (pooler Supabase) + CAREER_OS_OWNER_ID (UUID do usuário)</li>
+              <li>• O tracker do career-ops (applications.md) não é alterado pelo dashboard.</li>
+            </ul>
+          </div>
+        </Card>
+
         <Card id="local">
-          <CardHeader title="Alterações locais" icon={<RotateCcw className="size-4" />} subtitle="Favoritos e movimentações feitas neste navegador" />
+          <CardHeader title="Alterações só neste navegador" icon={<RotateCcw className="size-4" />} subtitle="Favoritos e, sem persistência no servidor, movimentações do pipeline" />
           <div className="px-5 pb-5">
             <dl className="mb-4 grid grid-cols-3 gap-2 text-center">
               {[
@@ -76,7 +94,7 @@ export function SettingsView({ status }: { status: { active: string; setting: st
                 </div>
               ))}
             </dl>
-            <InfoNote tone="info">Ficam apenas no localStorage deste navegador. Não são candidaturas reais e não são sincronizadas.</InfoNote>
+            <InfoNote tone="info">Ficam apenas no localStorage deste navegador e não são sincronizadas. {persistence.persistent ? 'Com persistência ativa, apenas favoritos ficam aqui.' : ''}</InfoNote>
             <Button className="mt-4" variant="danger" disabled={localChanges === 0} onClick={() => setConfirm(true)} icon={<RotateCcw className="size-4" />}>
               Descartar alterações locais
             </Button>

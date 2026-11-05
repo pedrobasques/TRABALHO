@@ -34,7 +34,7 @@ interface Row {
   match: MatchResult;
 }
 
-function AppCard({ r, onOpen, local }: { r: Row; onOpen: () => void; local: boolean }) {
+function AppCard({ r, onOpen, origin }: { r: Row; onOpen: () => void; origin: 'persisted' | 'local' | null }) {
   return (
     <article
       draggable
@@ -58,7 +58,8 @@ function AppCard({ r, onOpen, local }: { r: Row; onOpen: () => void; local: bool
           <StatusBadge>
             <CountryLabel code={r.job.country} />
           </StatusBadge>
-          {local && <StatusBadge tone="info">local</StatusBadge>}
+          {origin === 'local' && <StatusBadge tone="warning" title="Alteração somente neste navegador">navegador</StatusBadge>}
+          {origin === 'persisted' && <StatusBadge tone="success" title="Registro persistido no servidor">salvo</StatusBadge>}
           {r.app.closedReason && <StatusBadge tone="neutral">{r.app.closedReason}</StatusBadge>}
         </div>
         {r.app.nextAction && (
@@ -73,7 +74,8 @@ function AppCard({ r, onOpen, local }: { r: Row; onOpen: () => void; local: bool
 }
 
 export function Pipeline() {
-  const { dataset, matches, moveApplication, isLocal } = useStore();
+  const { dataset, matches, moveApplication, changeOrigin, persistence } = useStore();
+  const persisted = persistence.kind === 'file' || persistence.kind === 'postgres';
   const toast = useToast();
   const sp = useSearchParams();
   const router = useRouter();
@@ -111,8 +113,10 @@ export function Pipeline() {
   const move = (appId: string, stage: PipelineStage) => {
     const r = rows.find((x) => x.app.id === appId);
     if (!r || r.app.stage === stage) return;
-    moveApplication(appId, stage);
-    toast(`"${r.job.title}" movida para ${STAGE_LABEL[stage]} — alteração local, não enviada a nenhuma empresa`);
+    void moveApplication(appId, stage).then((res) => {
+      if (!res.ok) toast(`Não foi possível mover "${r.job.title}": ${res.error}`, 'error');
+      else toast(`"${r.job.title}" → ${STAGE_LABEL[stage]} ${persisted ? '(salvo com histórico)' : '(somente neste navegador)'}. Nada é enviado a empresas.`);
+    });
   };
   const open = rows.find((r) => r.app.id === openId) ?? null;
   useEffect(() => {
@@ -170,9 +174,10 @@ export function Pipeline() {
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
         <SearchInput className="sm:w-72" label="Buscar candidaturas" placeholder="Buscar empresa, cargo, ação…" value={query} onChange={setQuery} />
         <MultiSelect label="País" value={countries} onChange={setCountries} options={[...new Set(rows.map((r) => r.job.country))].sort().map((c) => ({ value: c, label: countryName(c) }))} />
-        {dataset.origin === 'demo' && (
-          <p className="text-xs text-subtle sm:ml-auto">Movimentações ficam salvas só neste navegador e não representam candidaturas reais.</p>
-        )}
+        <p className="text-xs text-subtle sm:ml-auto" data-testid="pipeline-persistence-note">
+          {persisted ? `Movimentações persistidas (${persistence.kind === 'postgres' ? 'Supabase' : 'arquivo local'}) com histórico.` : persistence.kind === 'loading' ? 'Verificando persistência…' : 'Sem persistência no servidor: movimentações ficam só neste navegador.'}
+          {dataset.origin === 'demo' ? ' Dados DEMO — não são candidaturas reais.' : ''}
+        </p>
       </div>
 
       {rows.length === 0 ? (
@@ -187,7 +192,7 @@ export function Pipeline() {
                 {filtered
                   .filter((r) => r.app.stage === stage)
                   .map((r) => (
-                    <AppCard key={r.app.id} r={r} local={isLocal(r.app.id)} onOpen={() => setOpen(r.app.id)} />
+                    <AppCard key={r.app.id} r={r} origin={changeOrigin(r.app.id)} onOpen={() => setOpen(r.app.id)} />
                   ))}
                 {counts[stage] === 0 && <div className="grid flex-1 place-items-center rounded-lg border border-dashed border-border py-6 text-[11px] text-subtle">Vazia</div>}
               </PipelineColumn>
@@ -238,7 +243,10 @@ export function Pipeline() {
                 </select>
               </label>
               <InfoNote tone="info" icon={<Info className="size-3.5" />}>
-                Alterações aqui são locais (este navegador). Para dados reais, o status deve ser registrado pelo career-ops (<code>set-status.mjs</code>). Nada é enviado a empresas.
+                {persisted
+                  ? 'Mudanças de etapa são gravadas no servidor com histórico. O tracker do career-ops (applications.md) não é alterado — sincronização de volta via set-status.mjs é planejada.'
+                  : 'Sem persistência no servidor: mudanças ficam só neste navegador.'}{' '}
+                Nada é enviado a empresas.
               </InfoNote>
 
               {open.app.nextAction && (

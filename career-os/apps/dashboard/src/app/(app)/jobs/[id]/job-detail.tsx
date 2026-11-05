@@ -110,7 +110,9 @@ function ReqRow({ r }: { r: RequirementResult }) {
 }
 
 export function JobDetail({ id }: { id: string }) {
-  const { dataset, matches, isFavorite, toggleFavorite, addToPipeline } = useStore();
+  const { dataset, matches, isFavorite, toggleFavorite, addToPipeline, persistence } = useStore();
+  const [adding, setAdding] = useState(false);
+  const persisted = persistence.kind === 'file' || persistence.kind === 'postgres';
   const toast = useToast();
   const [confirm, setConfirm] = useState(false);
   const job = dataset.jobs.find((j) => j.id === id)!;
@@ -139,6 +141,7 @@ export function JobDetail({ id }: { id: string }) {
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             {job.origin === 'demo' && <DemoIndicator />}
+            {job.origin === 'career-ops' && <StatusBadge tone="accent">Coletada · career-ops</StatusBadge>}
             <JobStatusBadge s={job.status} />
             <CategoryBadge c={m.category} />
             {app && <StageBadge s={app.stage} />}
@@ -168,7 +171,7 @@ export function JobDetail({ id }: { id: string }) {
               <KanbanSquare className="size-4" /> No pipeline: {STAGE_LABEL[app.stage]}
             </Link>
           ) : (
-            <Button variant="primary" icon={<KanbanSquare className="size-4" />} onClick={() => setConfirm(true)} disabled={job.status === 'closed'}>
+            <Button variant="primary" icon={<KanbanSquare className="size-4" />} onClick={() => setConfirm(true)} disabled={job.status === 'closed' || adding || persistence.kind === 'loading'}>
               Enviar ao pipeline
             </Button>
           )}
@@ -302,6 +305,18 @@ export function JobDetail({ id }: { id: string }) {
             <p className="mt-3 text-[11px] text-subtle">O score mede aderência; elegibilidade é um gate separado. Nunca assumimos autorização de trabalho sem documento.</p>
           </Card>
 
+          {job.qualityIssues && job.qualityIssues.length > 0 && (
+            <Card className="p-5" data-testid="quality-issues">
+              <h2 className="mb-2 text-sm font-semibold">Qualidade dos dados</h2>
+              <ul className="space-y-1 text-xs text-warning">
+                {job.qualityIssues.map((i) => (
+                  <li key={i}>• {i}</li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11px] text-subtle">Campos ausentes reduzem a confiança do matching; nada é preenchido por suposição.</p>
+            </Card>
+          )}
+
           <Card className="p-5">
             <h2 className="mb-3 text-sm font-semibold">Informações da vaga</h2>
             <dl className="space-y-2 text-sm">
@@ -353,15 +368,21 @@ export function JobDetail({ id }: { id: string }) {
         title="Enviar ao pipeline?"
         description={
           <>
-            A vaga entra na etapa <strong>Descoberta</strong> do seu pipeline. {dataset.origin === 'demo' ? 'Por ser modo DEMO, ' : ''}o registro fica salvo apenas neste navegador — não é uma candidatura e nada é enviado à empresa.
+            A vaga entra na etapa <strong>Descoberta</strong> do seu pipeline.{' '}
+            {persisted ? `O registro é salvo no servidor (${persistence.kind === 'postgres' ? 'Supabase' : 'arquivo local'}) com histórico.` : 'Sem persistência no servidor: o registro fica somente neste navegador.'}{' '}
+            Não é uma candidatura e nada é enviado à empresa.
           </>
         }
         confirmLabel="Adicionar"
         onCancel={() => setConfirm(false)}
-        onConfirm={() => {
+        onConfirm={async () => {
           setConfirm(false);
-          const created = addToPipeline(id);
-          toast(created ? 'Adicionada ao pipeline (local)' : 'Esta vaga já está no pipeline', created ? 'success' : 'info');
+          setAdding(true);
+          const r = await addToPipeline(id);
+          setAdding(false);
+          if (!r.ok) toast(`Não foi possível adicionar: ${r.error}`, 'error');
+          else if (r.created === false) toast('Esta vaga já está no pipeline', 'info');
+          else toast(persisted ? 'Adicionada ao pipeline (salvo no servidor)' : 'Adicionada ao pipeline (somente neste navegador)');
         }}
       />
     </div>
