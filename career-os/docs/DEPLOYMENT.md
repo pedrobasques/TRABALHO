@@ -46,8 +46,25 @@ Sem banco, o pipeline mostra "Só navegador" (nada é fingido como persistido).
 3. Authentication → Users → *Add user* (seu e-mail). Copie o **UUID**.
 4. SQL Editor: `insert into public.app_users (id, email) values ('<UUID>', '<email>');`
 5. Database → Connection string → **Transaction pooler** (porta 6543), com `?sslmode=require`.
-6. Na Vercel: `DATABASE_URL=<pooler>` e `CAREER_OS_OWNER_ID=<UUID>`. Redeploy.
-7. Conferir: Settings do dashboard → "Persistência do pipeline" = Supabase / Postgres.
+6. **Certificado TLS do projeto:** Project Settings → Database → **SSL Configuration** → *Download certificate*
+   (arquivo `.crt`, PEM público — não é segredo, mas trate como configuração).
+7. Na Vercel (Production e Preview): `DATABASE_URL=<pooler>`, `CAREER_OS_OWNER_ID=<UUID>` e
+   `SUPABASE_CA_CERT=<conteúdo inteiro do .crt>` — cole do `-----BEGIN CERTIFICATE-----` ao `-----END CERTIFICATE-----`,
+   com as quebras de linha (aceita também `\n` literal; vários certificados concatenados são aceitos). Redeploy.
+8. Conferir: Settings do dashboard → "Persistência do pipeline" = Supabase / Postgres; `/dashboard` abre sem erro.
+
+#### TLS com o Supabase (por que `SUPABASE_CA_CERT`)
+O certificado do Supabase é emitido por uma CA própria, que não está no repositório de CAs do Node → sem ela a
+conexão falha com `SELF_SIGNED_CERT_IN_CHAIN`. Além disso, o node-postgres **descarta** o objeto `ssl` passado ao
+`Pool` quando a URL contém `sslmode`/`sslrootcert`. Por isso `createDb` (`packages/db/src/client.ts`), quando há
+`SUPABASE_CA_CERT`, remove esses parâmetros da URL e conecta com `ssl: { ca, rejectUnauthorized: true }`:
+TLS obrigatório, cadeia verificada contra a CA do projeto **e** hostname verificado. Host `*.supabase.com/.co`
+sem `SUPABASE_CA_CERT` é recusado com mensagem explícita (nada de `rejectUnauthorized:false`,
+`NODE_TLS_REJECT_UNAUTHORIZED=0` ou conexão sem TLS). Mensagens de erro nunca incluem a URL nem o certificado.
+
+Se, mesmo com o certificado baixado, o erro persistir no pooler, confira se o arquivo é o atual do painel (a CA
+pode ser rotacionada) e, como alternativa, use a conexão direta `db.<ref>.supabase.co:5432` com o mesmo certificado.
+Teste local: `TEST_TLS_DATABASE_URL`, `TEST_TLS_CA_FILE`, `TEST_TLS_OTHER_CA_FILE` → `packages/db/tests/tls.test.ts`.
 
 ### 4. Verificação pós-deploy
 - Aba anônima → a URL deve pedir login da Vercel; depois do login Vercel, a tela do Career OS pede a senha.
